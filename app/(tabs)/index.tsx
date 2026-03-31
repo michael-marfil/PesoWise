@@ -1,98 +1,84 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { StatusBar } from "expo-status-bar";
+import { ScrollView, StyleSheet, Text, View, RefreshControl } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import BalanceCard from "../../components/BalanceCard";
+import { CategoryLegend, DonutChart, MiniBarChart } from "../../components/Charts";
+import Header from "../../components/Header";
+import TransactionRow from "../../components/TransactionRow";
+import { useTransactions } from "../../context/TransactionContext";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+export default function OverviewScreen() {
+  const { balance, totalIncome, totalExpense, categoryTotals, weeklyData, filteredTransactions, deleteTransaction, setShowAdd, verdict, startDate, endDate, walletBalances, refreshData, refreshing } = useTransactions();
+  const pieData = categoryTotals.filter(c => c.spent > 0);
 
-export default function HomeScreen() {
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <SafeAreaView style={styles.safe}>
+      <StatusBar style="dark" />
+      <Header onAddPress={() => setShowAdd(true)} />
+      
+      <ScrollView 
+        style={styles.scroll} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={refreshData} colors={["#378ADD"]} tintColor="#378ADD" />
+        }
+      >
+        <BalanceCard balance={balance} totalIncome={totalIncome} totalExpense={totalExpense} walletBalances={walletBalances} />
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+        {/* --- THE VERDICT CARD --- */}
+        <View style={[styles.verdictCard, { borderColor: verdict.color + '40', backgroundColor: verdict.color + '08' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={[styles.verdictDot, { backgroundColor: verdict.color }]} />
+            <Text style={[styles.verdictTitle, { color: verdict.color }]}>{verdict.title}</Text>
+          </View>
+          <Text style={styles.verdictMsg}>{verdict.message}</Text>
+        </View>
+
+        <Text style={styles.section}>Spending by Category</Text>
+        <Text style={styles.rangeSub}>{startDate} to {endDate}</Text>
+        <DonutChart data={pieData} />
+        <CategoryLegend data={pieData} />
+
+        <Text style={[styles.section, { marginTop: 20 }]}>Weekly Spending</Text>
+        <MiniBarChart data={weeklyData} />
+
+        <Text style={[styles.section, { marginTop: 20 }]}>Recent Transactions</Text>
+        {filteredTransactions.slice(0, 5).map(t => (
+          <TransactionRow key={t.id} t={t} onDelete={deleteTransaction} />
+        ))}
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  safe:    { flex: 1, backgroundColor: "#fff" },
+  scroll:  { flex: 1, paddingHorizontal: 20 },
+  section: { fontSize: 14, fontWeight: "600", color: "#111", marginBottom: 4, marginTop: 10 },
+  rangeSub: { fontSize: 11, color: '#aaa', marginBottom: 10, fontWeight: '500' },
+  verdictCard: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginVertical: 10,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  verdictDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  verdictTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
+  verdictMsg: {
+    fontSize: 13,
+    color: '#555',
+    marginTop: 6,
+    lineHeight: 18,
+    fontWeight: '500',
+  }
 });

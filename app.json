@@ -8,6 +8,10 @@
     "scheme": "pesowise",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "updates": {
+      "url": "https://u.expo.dev/d59ed6f5-4572-4cf4-b9b7-809667200502"
+    },
+    "runtimeVersion": "1.0.0",
     "ios": {
       "supportsTablet": true
     },
@@ -19,7 +23,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.michaelmarfil.PesoWise"
     },
     "web": {
       "output": "static",
@@ -38,11 +43,20 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-secure-store",
+      "@react-native-community/datetimepicker",
+      "expo-updates"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d59ed6f5-4572-4cf4-b9b7-809667200502"
+      }
     }
   }
 }
