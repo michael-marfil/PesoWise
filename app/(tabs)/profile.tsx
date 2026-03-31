@@ -60,12 +60,14 @@ export default function ProfileScreen() {
       const update = await Updates.checkForUpdateAsync();
       if (update.isAvailable) {
         await Updates.fetchUpdateAsync();
-        Alert.alert("Success", "Update ready!", [{ text: "Restart", onPress: () => Updates.reloadAsync() }]);
+        Alert.alert("Success", "Update downloaded. Restart now?", [
+          { text: "Restart Now", onPress: () => Updates.reloadAsync() }
+        ]);
       } else {
-        Alert.alert("Up to Date", "No fixes found.");
+        Alert.alert("Up to Date", "You are already running the latest version.");
       }
     } catch (e: any) {
-      Alert.alert("Error", e.message);
+      Alert.alert("Update Check Failed", e.message);
     } finally {
       setUpdateLoading(false);
     }
@@ -80,7 +82,7 @@ export default function ProfileScreen() {
         <Text style={styles.catNameText}>{c.name}</Text>
       </View>
       {!c.is_default ? (
-        <TouchableOpacity onPress={() => deleteCategory(typeof c.id === 'number' ? c.id : parseInt(c.id, 10))}>
+        <TouchableOpacity onPress={() => deleteCategory(c.id)}>
           <Ionicons name="trash-outline" size={18} color="#F09595" />
         </TouchableOpacity>
       ) : (
@@ -96,6 +98,7 @@ export default function ProfileScreen() {
           <Text style={styles.title}>Account</Text>
         </View>
 
+        {/* PROFILE CARD */}
         <View style={styles.profileCard}>
           <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage} disabled={isSubmitting}>
             {profile?.avatar_url ? (
@@ -109,32 +112,69 @@ export default function ProfileScreen() {
           <Text style={styles.userEmail}>{user?.email}</Text>
         </View>
 
+        {/* SETTINGS SECTION */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>General Settings</Text>
+          
           <View style={styles.settingItem}>
             <View style={styles.settingInfo}>
               <Ionicons name="person-outline" size={20} color="#666" />
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={styles.settingLabel}>Display Name</Text>
-                {isEditing ? <TextInput style={styles.input} value={name} onChangeText={setName} autoFocus /> : <Text style={styles.settingValue}>{profile?.full_name || "Set a name"}</Text>}
+                {isEditing ? (
+                  <TextInput 
+                    style={styles.input} 
+                    value={name} 
+                    onChangeText={setName} 
+                    autoFocus
+                    placeholder="Enter nickname"
+                  />
+                ) : (
+                  <Text style={styles.settingValue}>{profile?.full_name || "Set a name"}</Text>
+                )}
               </View>
             </View>
-            <TouchableOpacity onPress={isEditing ? handleSaveProfile : () => setIsEditing(true)} style={styles.editBtn}>
-              {isSubmitting ? <ActivityIndicator size="small" color="#378ADD" /> : <Text style={styles.editBtnText}>{isEditing ? "Save" : "Edit"}</Text>}
+            <TouchableOpacity 
+              onPress={isEditing ? handleSaveProfile : () => setIsEditing(true)}
+              style={styles.editBtn}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color="#378ADD" />
+              ) : (
+                <Text style={styles.editBtnText}>{isEditing ? "Save" : "Edit"}</Text>
+              )}
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.settingItem} onPress={onCheckForUpdates}>
-            <View style={styles.settingInfo}><Ionicons name="cloud-download-outline" size={20} color="#666" /><View style={{ flex: 1, marginLeft: 12 }}><Text style={styles.settingLabel}>App Updates</Text><Text style={styles.settingValue}>Check for fixes</Text></View></View>
-            {updateLoading ? <ActivityIndicator size="small" color="#378ADD" /> : <Ionicons name="chevron-forward" size={18} color="#ccc" />}
-          </TouchableOpacity>
+          <View style={styles.settingItem}>
+            <View style={styles.settingInfo}>
+              <Ionicons name="cloud-download-outline" size={20} color="#666" />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.settingLabel}>App Updates</Text>
+                <Text style={styles.settingValue}>Check for code fixes</Text>
+              </View>
+            </View>
+            <TouchableOpacity 
+              onPress={onCheckForUpdates}
+              style={styles.editBtn}
+              disabled={updateLoading}
+            >
+              {updateLoading ? (
+                <ActivityIndicator size="small" color="#378ADD" />
+              ) : (
+                <Text style={styles.editBtnText}>Check</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* MANAGED CATEGORIES */}
+        {/* CATEGORIES SECTION */}
         <View style={styles.section}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
             <Text style={styles.sectionTitle}>Expense Categories</Text>
-            <TouchableOpacity onPress={() => setShowCatModal(true)}><Text style={styles.addText}>+ Add New</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowCatModal(true)}>
+              <Text style={{ color: '#378ADD', fontWeight: '700', fontSize: 13 }}>+ Add New</Text>
+            </TouchableOpacity>
           </View>
 
           <Text style={styles.groupLabel}>Essentials (Default)</Text>
@@ -149,12 +189,21 @@ export default function ProfileScreen() {
         </View>
 
         <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
-          <Ionicons name="log-out-outline" size={20} color="#E24B4A" /><Text style={styles.logoutText}>Sign Out</Text>
+          <Ionicons name="log-out-outline" size={20} color="#E24B4A" />
+          <Text style={styles.logoutText}>Sign Out</Text>
         </TouchableOpacity>
+
+        <View style={styles.debugInfo}>
+          <Text style={styles.debugText}>Runtime: {Updates.runtimeVersion}</Text>
+          <Text style={styles.debugText}>Update ID: {Updates.updateId || "None (Base APK)"}</Text>
+          <Text style={styles.debugText}>Channel: {Updates.channel || "Preview"}</Text>
+        </View>
+
+        <Text style={styles.version}>PesoWise v1.0.1 - Build Reset Fix</Text>
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* ADD MODAL */}
+      {/* ADD CATEGORY MODAL */}
       <Modal visible={showCatModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -198,12 +247,14 @@ const styles = StyleSheet.create({
   input: { fontSize: 15, color: '#378ADD', fontWeight: '600', padding: 0, marginTop: 2 },
   editBtn: { paddingHorizontal: 15, paddingVertical: 6, borderRadius: 8, backgroundColor: '#E6F1FB' },
   editBtnText: { fontSize: 13, color: '#378ADD', fontWeight: '700' },
-  addText: { color: '#378ADD', fontWeight: '700', fontSize: 13 },
   catRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 },
   catIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   catNameText: { fontSize: 15, color: '#444', fontWeight: '500' },
   logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16, borderRadius: 16, backgroundColor: '#FFF5F5', borderWidth: 1, borderColor: '#FFE0E0' },
   logoutText: { fontSize: 16, color: '#E24B4A', fontWeight: '700' },
+  debugInfo: { marginTop: 30, padding: 15, backgroundColor: '#f0f0f0', borderRadius: 12 },
+  debugText: { fontSize: 10, color: '#999', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  version: { textAlign: 'center', color: '#ccc', fontSize: 12, marginTop: 40 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalCard: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
   modalTitle: { fontSize: 20, fontWeight: '800', marginBottom: 20, color: '#111' },
