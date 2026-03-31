@@ -49,7 +49,7 @@ export default function AnimatedSplashScreen({ onFinish }: { onSuccess?: () => v
     // 2. Trigger Finish after animations complete
     const timer = setTimeout(() => {
       onFinish();
-    }, 3500); // Slightly longer than the bar animation
+    }, 4000); // Safety fallback (animation is ~3.5s)
 
     return () => clearTimeout(timer);
   }, []);
