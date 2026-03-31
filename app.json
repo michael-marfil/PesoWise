@@ -2,7 +2,7 @@
   "expo": {
     "name": "PesoWise",
     "slug": "PesoWise",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "pesowise",
@@ -11,7 +11,7 @@
     "updates": {
       "url": "https://u.expo.dev/d59ed6f5-4572-4cf4-b9b7-809667200502"
     },
-    "runtimeVersion": "1.0.0",
+    "runtimeVersion": "1.0.1",
     "ios": {
       "supportsTablet": true
     },
