@@ -10,8 +10,12 @@ import * as SecureStore from 'expo-secure-store';
 import PinScreen from "./(auth)/pin";
 import AnimatedSplashScreen from "../components/AnimatedSplashScreen";
 import * as Updates from 'expo-updates';
+import * as SplashScreen from 'expo-splash-screen';
 
 const PIN_KEY = 'user_app_pin';
+
+// Keep the splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync();
 
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => ({
@@ -45,7 +49,6 @@ function RootNavigation() {
 
   // 2. Handle simple navigation redirects
   useEffect(() => {
-    // Only redirect if splash is done AND auth is not loading
     if (!isSplashFinished || authLoading || hasPin === null) return;
 
     const inAuthGroup = segments[0] === "(auth)";
@@ -77,14 +80,19 @@ function RootNavigation() {
     }
   }, []);
 
+  // 4. Hide Native Splash once JS is ready
+  useEffect(() => {
+    if (hasPin !== null && !authLoading) {
+      SplashScreen.hideAsync();
+    }
+  }, [hasPin, authLoading]);
+
   // --- UI RENDERING ---
 
-  // Layer 1: Splash Screen
   if (!isSplashFinished) {
     return <AnimatedSplashScreen onFinish={() => setIsSplashFinished(true)} />;
   }
 
-  // Layer 2: Global Loading
   if (authLoading || hasPin === null) {
     return (
       <View style={styles.centered}>
@@ -93,7 +101,6 @@ function RootNavigation() {
     );
   }
 
-  // Layer 3: Auth Logic
   if (!session) {
     return (
       <Stack screenOptions={{ headerShown: false }}>
@@ -102,7 +109,6 @@ function RootNavigation() {
     );
   }
 
-  // Layer 4: PIN Security
   if (session && !isVerified) {
     if (!hasPin) {
       return <PinScreen mode="setup" onSuccess={() => { setHasPin(true); setVerified(true); }} />;
@@ -110,7 +116,6 @@ function RootNavigation() {
     return <PinScreen mode="verify" onSuccess={() => setVerified(true)} />;
   }
 
-  // Layer 5: Main App
   return (
     <>
       <Stack screenOptions={{ headerShown: false }}>
