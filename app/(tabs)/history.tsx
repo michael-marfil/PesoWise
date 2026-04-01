@@ -4,13 +4,14 @@ import { ScrollView, StyleSheet, Text, View, TouchableOpacity, RefreshControl, D
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Rect, G, Text as SvgText } from 'react-native-svg';
 import TransactionRow from "../../components/TransactionRow";
+import TransactionDetailsModal from "../../components/TransactionDetailsModal";
 import { useTransactions } from "../../context/TransactionContext";
 import { fmt } from "../../constants/data";
 
 const W = Dimensions.get("window").width;
 
 export default function HistoryScreen() {
-  const { filteredTransactions, deleteTransaction, reports, refreshData, refreshing } = useTransactions();
+  const { filteredTransactions, deleteTransaction, reports, refreshData, refreshing, selectedTransaction, setSelectedTransaction } = useTransactions();
   const [tab, setTab] = useState<'transactions' | 'reports'>('transactions');
 
   // Comparison Chart Component for Reports
@@ -88,7 +89,12 @@ export default function HistoryScreen() {
           <>
             <Text style={styles.subtitle}>{filteredTransactions.length} transactions in this range</Text>
             {filteredTransactions.map(t => (
-              <TransactionRow key={t.id} t={t} onDelete={deleteTransaction} />
+              <TransactionRow 
+                key={t.id} 
+                t={t} 
+                onDelete={deleteTransaction} 
+                onPress={() => setSelectedTransaction(t)} 
+              />
             ))}
           </>
         ) : (
@@ -123,6 +129,13 @@ export default function HistoryScreen() {
         )}
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* TRANSACTION DETAILS MODAL */}
+      <TransactionDetailsModal 
+        visible={!!selectedTransaction} 
+        transaction={selectedTransaction} 
+        onClose={() => setSelectedTransaction(null)} 
+      />
     </SafeAreaView>
   );
 }

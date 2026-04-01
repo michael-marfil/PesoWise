@@ -1,11 +1,11 @@
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import * as Updates from 'expo-updates';
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, TextInput, ActivityIndicator, Alert, ScrollView, Platform, Image, Modal } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
-import { useTransactions, Category } from '../../context/TransactionContext';
-import { Ionicons } from '@expo/vector-icons';
-import * as Updates from 'expo-updates';
-import * as ImagePicker from 'expo-image-picker';
+import { Category, useTransactions } from '../../context/TransactionContext';
 
 const PRESET_ICONS = ["🎮", "🐶", "🎁", "🛠️", "💼", "🍿", "🏠", "✈️", "🛒", "🎓", "📱", "💇", "💪", "🌱"];
 const PRESET_COLORS = ["#378ADD", "#1D9E75", "#BA7517", "#D4537E", "#888780", "#6A5ACD", "#FF6347", "#20B2AA"];
@@ -199,7 +199,7 @@ export default function ProfileScreen() {
           <Text style={styles.debugText}>Channel: {Updates.channel || "Preview"}</Text>
         </View>
 
-        <Text style={styles.version}>PesoWise v1.0.1 - Build Reset Fix</Text>
+        <Text style={styles.version}>PesoWise v1.0.1</Text>
         <View style={{ height: 40 }} />
       </ScrollView>
 
