@@ -10,6 +10,10 @@ import * as SecureStore from 'expo-secure-store';
 import PinScreen from "./(auth)/pin";
 import AnimatedSplashScreen from "../components/AnimatedSplashScreen";
 import * as Updates from 'expo-updates';
+import * as SplashScreen from 'expo-splash-screen';
+
+// Prevent the splash screen from auto-hiding before asset loading is complete.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const PIN_KEY = 'user_app_pin';
 
@@ -30,6 +34,11 @@ function RootNavigation() {
 
   const [hasPin, setHasPin] = useState<boolean | null>(null);
   const [isSplashFinished, setIsSplashFinished] = useState(false);
+
+  // Hide the native splash screen immediately on mount since we have our own animated one
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
 
   // 1. Check for existing PIN
   useEffect(() => {
