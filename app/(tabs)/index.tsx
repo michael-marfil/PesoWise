@@ -5,10 +5,17 @@ import BalanceCard from "../../components/BalanceCard";
 import { CategoryLegend, DonutChart, MiniBarChart } from "../../components/Charts";
 import Header from "../../components/Header";
 import TransactionRow from "../../components/TransactionRow";
+import TransactionDetailsModal from "../../components/TransactionDetailsModal";
 import { useTransactions } from "../../context/TransactionContext";
 
 export default function OverviewScreen() {
-  const { balance, totalIncome, totalExpense, categoryTotals, weeklyData, filteredTransactions, deleteTransaction, setShowAdd, verdict, startDate, endDate, walletBalances, refreshData, refreshing } = useTransactions();
+  const { 
+    balance, totalIncome, totalExpense, categoryTotals, weeklyData, 
+    filteredTransactions, deleteTransaction, setShowAdd, verdict, 
+    startDate, endDate, walletBalances, refreshData, refreshing,
+    selectedTransaction, setSelectedTransaction 
+  } = useTransactions();
+
   const pieData = categoryTotals.filter(c => c.spent > 0);
 
   return (
@@ -25,7 +32,7 @@ export default function OverviewScreen() {
       >
         <BalanceCard balance={balance} totalIncome={totalIncome} totalExpense={totalExpense} walletBalances={walletBalances} />
 
-        {/* --- THE VERDICT CARD --- */}
+        {/* THE VERDICT CARD */}
         <View style={[styles.verdictCard, { borderColor: verdict.color + '40', backgroundColor: verdict.color + '08' }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <View style={[styles.verdictDot, { backgroundColor: verdict.color }]} />
@@ -44,10 +51,22 @@ export default function OverviewScreen() {
 
         <Text style={[styles.section, { marginTop: 20 }]}>Recent Transactions</Text>
         {filteredTransactions.slice(0, 5).map(t => (
-          <TransactionRow key={t.id} t={t} onDelete={deleteTransaction} />
+          <TransactionRow 
+            key={t.id} 
+            t={t} 
+            onDelete={deleteTransaction} 
+            onPress={() => setSelectedTransaction(t)} 
+          />
         ))}
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* TRANSACTION DETAILS MODAL */}
+      <TransactionDetailsModal 
+        visible={!!selectedTransaction} 
+        transaction={selectedTransaction} 
+        onClose={() => setSelectedTransaction(null)} 
+      />
     </SafeAreaView>
   );
 }

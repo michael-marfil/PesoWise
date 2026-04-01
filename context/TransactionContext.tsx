@@ -75,7 +75,7 @@ type ContextType = {
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
   uploadAvatar: (uri: string) => Promise<void>;
   addCategory: (name: string, icon: string, color: string) => Promise<void>;
-  deleteCategory: (id: number) => Promise<void>;
+  deleteCategory: (id: number | string) => Promise<void>;
   addSavingsGoal: (goal: Omit<SavingsGoal, 'id'>) => Promise<void>;
   updateSavingsGoalAmount: (id: number, amount: number, wallet: Wallet, goalName: string) => Promise<void>;
   refreshData: () => Promise<void>;
@@ -92,6 +92,8 @@ type ContextType = {
   archiveCurrentPlan: () => Promise<void>;
   showAdd: boolean;
   setShowAdd: (v: boolean) => void;
+  selectedTransaction: Transaction | null; // NEW
+  setSelectedTransaction: (t: Transaction | null) => void; // NEW
   loading: boolean;
   refreshing: boolean;
   isSubmitting: boolean;
@@ -108,6 +110,7 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
   const [budgets, setBudgets]           = useState<Record<string, number>>({});
   const [profile, setProfile]           = useState<Profile | null>(null);
   const [showAdd, setShowAdd]           = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null); // NEW
   const [loading, setLoading]           = useState(true);
   const [refreshing, setRefreshing]     = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -186,7 +189,7 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteCategory = async (id: number | string) => {
-    if (typeof id === 'string' && id.startsWith('def-')) return; // Safety guard
+    if (typeof id === 'string' && id.startsWith('def-')) return;
     setIsSubmitting(true);
     const { error } = await supabase.from("categories").delete().eq("id", id);
     if (!error) {
@@ -398,7 +401,6 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
         if (data[0].date < startDate) setStartDate(data[0].date);
         if (data[0].date > endDate) setEndDate(data[0].date);
         
-        // --- TRIGGER BUDGET ALERT ONLY ON ADD ---
         if (form.type === 'expense') {
           const current = categoryTotals.find(c => c.name === form.category);
           if (current && current.budget > 0) {
@@ -452,7 +454,7 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
       form, setForm, budgets, updateBudget, updateProfile, uploadAvatar, addCategory, deleteCategory, addSavingsGoal, updateSavingsGoalAmount, refreshData,
       totalIncome, totalExpense, totalBudgeted, balance, walletBalances,
       categoryTotals, verdict, weeklyData, addTransaction, deleteTransaction, archiveCurrentPlan,
-      showAdd, setShowAdd, loading, refreshing, isSubmitting
+      showAdd, setShowAdd, selectedTransaction, setSelectedTransaction, loading, refreshing, isSubmitting
     }}>
       {children}
     </TransactionContext.Provider>

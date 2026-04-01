@@ -2,14 +2,18 @@ import { StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from "rea
 import { CATEGORIES, fmt } from "../constants/data";
 import { Transaction, useTransactions } from "../context/TransactionContext";
 
-type Props = { t: Transaction; onDelete: (id: number) => void };
+type Props = { 
+  t: Transaction; 
+  onDelete: (id: number) => void;
+  onPress?: () => void; // NEW
+};
 
-export default function TransactionRow({ t, onDelete }: Props) {
+export default function TransactionRow({ t, onDelete, onPress }: Props) {
   const { isSubmitting } = useTransactions();
   const cat = CATEGORIES.find(c => c.name === t.category) || CATEGORIES[5];
   
   return (
-    <View style={styles.row}>
+    <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
       <View style={[styles.icon, { backgroundColor: cat.color + "20" }]}>
         <Text style={{ fontSize: 18 }}>{cat.icon}</Text>
       </View>
@@ -29,7 +33,7 @@ export default function TransactionRow({ t, onDelete }: Props) {
           )}
         </TouchableOpacity>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
