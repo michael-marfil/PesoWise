@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, Animated, Dimensions, Platform } from 'react-native';
-import * as SplashScreen from 'expo-splash-screen';
 
 const { width } = Dimensions.get('window');
 
@@ -12,17 +11,7 @@ export default function AnimatedSplashScreen({ onFinish }: { onFinish: () => voi
   const progressWidth = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // FORCE HIDE the static native splash as soon as this component mounts
-    async function hideNativeSplash() {
-      try {
-        await SplashScreen.hideAsync();
-      } catch (e) {
-        // Ignore errors if already hidden
-      }
-    }
-    hideNativeSplash();
-
-    // Start animations
+    // Start animations immediately
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -53,10 +42,10 @@ export default function AnimatedSplashScreen({ onFinish }: { onFinish: () => voi
       ]),
     ]).start();
 
-    // Safety fallback timer
+    // Safety fallback timer to move to Login/Dashboard
     const timer = setTimeout(() => {
       onFinish();
-    }, 4000);
+    }, 3500);
 
     return () => clearTimeout(timer);
   }, []);
@@ -84,7 +73,7 @@ export default function AnimatedSplashScreen({ onFinish }: { onFinish: () => voi
           <Text style={styles.loadingText}>LOADING...</Text>
         </View>
       </Animated.View>
-      <Animated.Text style={[styles.version, { opacity: fadeAnim }]}>v1.0.1 - Fix</Animated.Text>
+      <Animated.Text style={[styles.version, { opacity: fadeAnim }]}>v1.0.1 - Auto-Fix</Animated.Text>
     </View>
   );
 }

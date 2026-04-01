@@ -10,12 +10,8 @@ import * as SecureStore from 'expo-secure-store';
 import PinScreen from "./(auth)/pin";
 import AnimatedSplashScreen from "../components/AnimatedSplashScreen";
 import * as Updates from 'expo-updates';
-import * as SplashScreen from 'expo-splash-screen';
 
 const PIN_KEY = 'user_app_pin';
-
-// 1. Keep the splash screen visible while we fetch resources
-SplashScreen.preventAutoHideAsync().catch(() => {});
 
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => ({
@@ -35,7 +31,7 @@ function RootNavigation() {
   const [hasPin, setHasPin] = useState<boolean | null>(null);
   const [isSplashFinished, setIsSplashFinished] = useState(false);
 
-  // 2. Check for existing PIN
+  // 1. Check for existing PIN
   useEffect(() => {
     (async () => {
       try {
@@ -47,7 +43,7 @@ function RootNavigation() {
     })();
   }, [session]);
 
-  // 3. Handle simple navigation redirects
+  // 2. Handle simple navigation redirects
   useEffect(() => {
     if (!isSplashFinished || authLoading || hasPin === null) return;
 
@@ -61,7 +57,7 @@ function RootNavigation() {
     }
   }, [session, authLoading, segments, isVerified, hasPin, isSplashFinished]);
 
-  // 4. LISTEN FOR OTA UPDATES
+  // 3. LISTEN FOR OTA UPDATES
   useEffect(() => {
     if (!__DEV__) {
       const checkUpdate = async () => {
@@ -82,12 +78,12 @@ function RootNavigation() {
 
   // --- UI RENDERING ---
 
-  // Phase A: Animated Splash (This component now handles hiding the native splash)
+  // Phase 1: Show the Animation immediately
   if (!isSplashFinished) {
     return <AnimatedSplashScreen onFinish={() => setIsSplashFinished(true)} />;
   }
 
-  // Phase B: Global Auth/PIN Check Loading
+  // Phase 2: After animation, handle loading/auth/app
   if (authLoading || hasPin === null) {
     return (
       <View style={styles.centered}>
@@ -96,7 +92,6 @@ function RootNavigation() {
     );
   }
 
-  // Phase C: Auth Stack
   if (!session) {
     return (
       <Stack screenOptions={{ headerShown: false }}>
@@ -105,7 +100,6 @@ function RootNavigation() {
     );
   }
 
-  // Phase D: Security PIN Gate
   if (session && !isVerified) {
     if (!hasPin) {
       return <PinScreen mode="setup" onSuccess={() => { setHasPin(true); setVerified(true); }} />;
@@ -113,7 +107,6 @@ function RootNavigation() {
     return <PinScreen mode="verify" onSuccess={() => setVerified(true)} />;
   }
 
-  // Phase E: Main App Dashboard
   return (
     <>
       <Stack screenOptions={{ headerShown: false }}>
