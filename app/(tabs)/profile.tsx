@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Updates from 'expo-updates';
+import { Link } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -166,6 +167,19 @@ export default function ProfileScreen() {
               )}
             </TouchableOpacity>
           </View>
+
+          <Link href="/recurring" asChild>
+            <TouchableOpacity style={styles.settingItem}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="calendar-outline" size={20} color="#666" />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.settingLabel}>Subscriptions</Text>
+                  <Text style={styles.settingValue}>Manage recurring logs</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#ccc" />
+            </TouchableOpacity>
+          </Link>
         </View>
 
         {/* CATEGORIES SECTION */}
