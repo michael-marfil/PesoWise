@@ -27,37 +27,67 @@ export default function AddModal({ visible, form, onFormChange, onSubmit, onClos
           </View>
 
           <View style={styles.typeRow}>
-            {(["expense", "income"] as const).map(type => (
+            {(["expense", "income", "transfer"] as const).map(type => (
               <TouchableOpacity key={type} onPress={() => onFormChange({ ...form, type })}
-                style={[styles.typeBtn, form.type === type && { borderColor: type === "income" ? "#1D9E75" : "#378ADD", backgroundColor: type === "income" ? "#E1F5EE" : "#E6F1FB" }]}
+                style={[styles.typeBtn, form.type === type && { 
+                  borderColor: type === "income" ? "#1D9E75" : type === "transfer" ? "#EF9F27" : "#378ADD", 
+                  backgroundColor: type === "income" ? "#E1F5EE" : type === "transfer" ? "#FFF7E6" : "#E6F1FB" 
+                }]}
                 disabled={isSubmitting}>
-                <Text style={[styles.typeTxt, form.type === type && { color: type === "income" ? "#0F6E56" : "#185FA5", fontWeight: "600" }]}>{type}</Text>
+                <Text style={[styles.typeTxt, form.type === type && { 
+                  color: type === "income" ? "#0F6E56" : type === "transfer" ? "#B46F00" : "#185FA5", 
+                  fontWeight: "600" 
+                }]}>{type}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
           <View style={styles.walletRow}>
-            {wallets.map(w => (
-              <TouchableOpacity key={w} onPress={() => onFormChange({ ...form, wallet: w })}
-                style={[styles.walletBtn, form.wallet === w && styles.walletBtnActive]}
-                disabled={isSubmitting}>
-                <Text style={[styles.walletTxt, form.wallet === w && styles.walletTxtActive]}>{w}</Text>
-              </TouchableOpacity>
-            ))}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>{form.type === 'transfer' ? 'From' : 'Wallet'}</Text>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                {wallets.map(w => (
+                  <TouchableOpacity key={w} onPress={() => onFormChange({ ...form, wallet: w })}
+                    style={[styles.walletBtn, form.wallet === w && styles.walletBtnActive]}
+                    disabled={isSubmitting}>
+                    <Text style={[styles.walletTxt, form.wallet === w && styles.walletTxtActive]}>{w}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
           </View>
 
-          <TextInput style={styles.input} placeholder="Description (e.g. Jollibee)" value={form.description} onChangeText={v => onFormChange({ ...form, description: v })} editable={!isSubmitting} />
+          {form.type === 'transfer' && (
+            <View style={[styles.walletRow, { marginTop: -8 }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>To</Text>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  {wallets.map(w => (
+                    <TouchableOpacity key={w} onPress={() => onFormChange({ ...form, to_wallet: w })}
+                      style={[styles.walletBtn, form.to_wallet === w && { borderColor: '#EF9F27', backgroundColor: '#FFF7E6' }]}
+                      disabled={isSubmitting || form.wallet === w}>
+                      <Text style={[styles.walletTxt, form.to_wallet === w && { color: '#B46F00', fontWeight: '700' }]}>{w}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+          )}
+
+          <TextInput style={styles.input} placeholder="Description (e.g. GCash Cash-in)" value={form.description} onChangeText={v => onFormChange({ ...form, description: v })} editable={!isSubmitting} />
           <TextInput style={styles.input} placeholder="Amount (₱)" keyboardType="numeric" value={form.amount} onChangeText={v => onFormChange({ ...form, amount: v })} editable={!isSubmitting} />
 
-          <View style={styles.pills}>
-            {categories.map(c => (
-              <TouchableOpacity key={c.id} onPress={() => onFormChange({ ...form, category: c.name })}
-                style={[styles.pill, form.category === c.name && { borderColor: c.color, backgroundColor: c.color + "20" }]}
-                disabled={isSubmitting}>
-                <Text style={[styles.pillTxt, form.category === c.name && { color: c.color }]}>{c.icon} {c.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {form.type !== 'transfer' && (
+            <View style={styles.pills}>
+              {categories.map(c => (
+                <TouchableOpacity key={c.id} onPress={() => onFormChange({ ...form, category: c.name })}
+                  style={[styles.pill, form.category === c.name && { borderColor: c.color, backgroundColor: c.color + "20" }]}
+                  disabled={isSubmitting}>
+                  <Text style={[styles.pillTxt, form.category === c.name && { color: c.color }]}>{c.icon} {c.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
           <TextInput style={styles.input} placeholder="Date (YYYY-MM-DD)" value={form.date} onChangeText={v => onFormChange({ ...form, date: v })} editable={!isSubmitting} />
 
@@ -76,6 +106,7 @@ const styles = StyleSheet.create({
   handle:   { width: 40, height: 4, backgroundColor: "#ddd", borderRadius: 99, alignSelf: "center", marginBottom: 20 },
   headerRow:{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   title:    { fontSize: 18, fontWeight: "700", color: "#111" },
+  label:    { fontSize: 11, fontWeight: "700", color: "#aaa", textTransform: 'uppercase', marginBottom: 4, marginLeft: 2 },
   typeRow:  { flexDirection: "row", gap: 8, marginBottom: 12 },
   typeBtn:  { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 2, borderColor: "#e0e0e0", alignItems: "center" },
   typeTxt:  { fontSize: 14, color: "#888", textTransform: 'capitalize' },
