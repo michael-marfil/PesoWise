@@ -66,8 +66,9 @@ function RootNavigation() {
     }
   }, [session, authLoading, segments, isVerified, hasPin, isSplashFinished]);
 
-  // 3. LISTEN FOR OTA UPDATES
+  // 3. LISTEN FOR OTA UPDATES & SETUP DAILY REMINDERS
   useEffect(() => {
+    // Check for updates
     if (!__DEV__) {
       const checkUpdate = async () => {
         try {
@@ -83,6 +84,40 @@ function RootNavigation() {
       };
       checkUpdate();
     }
+
+    // SETUP DAILY 8 PM REMINDER
+    (async () => {
+      try {
+        const { status } = await Notifications.getPermissionsAsync();
+        let finalStatus = status;
+        if (status !== 'granted') {
+          const { status: askStatus } = await Notifications.requestPermissionsAsync();
+          finalStatus = askStatus;
+        }
+
+        if (finalStatus === 'granted') {
+          // Clear old ones to avoid duplicates
+          await Notifications.cancelAllScheduledNotificationsAsync();
+
+          // Schedule new daily reminder
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: "PesoWise Reminder 💰",
+              body: "Don't forget to log your transactions for today!",
+              sound: true,
+            },
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.DAILY,
+              hour: 20, // 8 PM
+              minute: 0,
+            },
+          });
+          console.log("✅ 8 PM Reminder scheduled!");
+        }
+      } catch (e) {
+        console.warn("Notification setup failed", e);
+      }
+    })();
   }, []);
 
   // --- UI RENDERING ---
