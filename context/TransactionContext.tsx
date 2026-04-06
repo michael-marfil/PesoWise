@@ -213,13 +213,29 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
   const addRecurringTransaction = async (rt: any) => {
     if (!user) return;
     setIsSubmitting(true);
-    const { data } = await supabase.from("recurring_transactions").insert([{ ...rt, user_id: user.id }]).select();
-    if (data) {
-      const newList = [data[0], ...recurringTransactions];
-      setRecurringTransactions(newList);
-      checkUpcoming(newList);
+    try {
+      const { data, error } = await supabase.from("recurring_transactions").insert([{ 
+        ...rt, 
+        user_id: user.id,
+        next_run_date: today() // Ensure it starts today
+      }]).select();
+      
+      if (error) {
+        console.error("Supabase Error:", error);
+        Alert.alert("Failed to save", error.message);
+        return;
+      }
+
+      if (data) {
+        const newList = [data[0], ...recurringTransactions];
+        setRecurringTransactions(newList);
+        checkUpcoming(newList);
+      }
+    } catch (e: any) {
+      Alert.alert("Error", e.message);
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   };
 
   const deleteRecurringTransaction = async (id: number) => {
