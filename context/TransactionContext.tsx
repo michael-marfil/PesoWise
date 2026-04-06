@@ -17,9 +17,10 @@ export type RecurringTransaction = {
   type: "expense" | "income";
   category: string;
   wallet: Wallet;
-  frequency: "daily" | "weekly" | "monthly";
+  frequency: "daily" | "weekly" | "monthly" | "15_30";
   next_run_date: string;
   last_run_date: string | null;
+  is_business_day_adjusted: boolean;
 };
 
 export type Category = {
@@ -100,8 +101,10 @@ type ContextType = {
   deleteCategory: (id: number | string) => Promise<void>;
   addSavingsGoal: (goal: Omit<SavingsGoal, 'id'>) => Promise<void>;
   updateSavingsGoalAmount: (id: number, amount: number, wallet: Wallet, goalName: string) => Promise<void>;
-  addRecurringTransaction: (rt: Omit<RecurringTransaction, 'id' | 'next_run_date' | 'last_run_date'>) => Promise<void>; // NEW
-  deleteRecurringTransaction: (id: number) => Promise<void>; // NEW
+  addRecurringTransaction: (rt: any) => Promise<void>;
+  deleteRecurringTransaction: (id: number) => Promise<void>;
+  logUpcomingTransaction: (rt: RecurringTransaction) => Promise<void>;
+  skipUpcomingTransaction: (rt: RecurringTransaction) => Promise<void>;
   refreshData: () => Promise<void>;
   totalIncome: number;
   totalExpense: number;
@@ -130,7 +133,8 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [reports, setReports]           = useState<BudgetReport[]>([]);
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
-  const [recurringTransactions, setRecurringTransactions] = useState<RecurringTransaction[]>([]); // NEW
+  const [recurringTransactions, setRecurringTransactions] = useState<RecurringTransaction[]>([]);
+  const [upcomingTransactions, setUpcomingTransactions] = useState<RecurringTransaction[]>([]); // Initialize here
   const [customCategories, setCustomCategories] = useState<Category[]>([]);
   const [budgets, setBudgets]           = useState<Record<string, number>>({});
   const [profile, setProfile]           = useState<Profile | null>(null);
@@ -201,74 +205,111 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
 
   const fetchRecurringTransactions = async () => {
     const { data } = await supabase.from("recurring_transactions").select("*").order("created_at", { ascending: false });
-    setRecurringTransactions(data || []);
+    const list = data || [];
+    setRecurringTransactions(list);
+    checkUpcoming(list);
   };
 
   const addRecurringTransaction = async (rt: any) => {
     if (!user) return;
     setIsSubmitting(true);
     const { data } = await supabase.from("recurring_transactions").insert([{ ...rt, user_id: user.id }]).select();
-    if (data) setRecurringTransactions(prev => [data[0], ...prev]);
+    if (data) {
+      const newList = [data[0], ...recurringTransactions];
+      setRecurringTransactions(newList);
+      checkUpcoming(newList);
+    }
     setIsSubmitting(false);
   };
 
   const deleteRecurringTransaction = async (id: number) => {
     setIsSubmitting(true);
     const { error } = await supabase.from("recurring_transactions").delete().eq("id", id);
-    if (!error) setRecurringTransactions(prev => prev.filter(rt => rt.id !== id));
+    if (!error) {
+      const newList = recurringTransactions.filter(rt => rt.id !== id);
+      setRecurringTransactions(newList);
+      checkUpcoming(newList);
+    }
     setIsSubmitting(false);
   };
 
-  const processRecurringTransactions = async () => {
-    if (!user) return;
-    const { data: recurring } = await supabase.from("recurring_transactions")
-      .select("*")
-      .lte("next_run_date", today());
-
-    if (!recurring || recurring.length === 0) return;
-
-    for (const rt of recurring) {
-      try {
-        const newTx = {
-          description: rt.description,
-          amount: rt.amount,
-          type: rt.type,
-          category: rt.category,
-          wallet: rt.wallet,
-          date: today(),
-          user_id: user.id
-        };
-        const { data: createdTx } = await supabase.from("transactions").insert([newTx]).select();
-        
-        if (createdTx) {
-          const nextRun = new Date(rt.next_run_date);
-          if (rt.frequency === 'daily') nextRun.setDate(nextRun.getDate() + 1);
-          else if (rt.frequency === 'weekly') nextRun.setDate(nextRun.getDate() + 7);
-          else if (rt.frequency === 'monthly') nextRun.setMonth(nextRun.getMonth() + 1);
-
-          const nextRunStr = nextRun.toISOString().split('T')[0];
-
-          await supabase.from("recurring_transactions")
-            .update({ last_run_date: today(), next_run_date: nextRunStr })
-            .eq("id", rt.id);
-
-          // 4. Send System Notification
-          Notifications.scheduleNotificationAsync({
-            content: {
-              title: "Auto-logged 💰",
-              body: `Processed: ${rt.description} (${fmt(rt.amount)})`,
-              sound: true,
-            },
-            trigger: null, // Trigger immediately
-          });
-
-          setTransactions(prev => [createdTx[0], ...prev]);
-          Toast.show({ type: 'success', text1: 'Auto-logged:', text2: rt.description });
-        }
-      } catch (e) {
-        console.error("Recurring Log Error:", e);
+  const checkUpcoming = (list: RecurringTransaction[]) => {
+    const todayStr = today();
+    const due = list.filter(rt => {
+      let targetDate = new Date(rt.next_run_date);
+      
+      if (rt.is_business_day_adjusted) {
+        const day = targetDate.getDay(); 
+        if (day === 0) targetDate.setDate(targetDate.getDate() - 2); // Sun -> Fri
+        else if (day === 6) targetDate.setDate(targetDate.getDate() - 1); // Sat -> Fri
       }
+
+      const finalTargetStr = targetDate.toISOString().split('T')[0];
+      return finalTargetStr <= todayStr;
+    });
+    setUpcomingTransactions(due);
+  };
+
+  const logUpcomingTransaction = async (rt: RecurringTransaction) => {
+    if (!user) return;
+    setIsSubmitting(true);
+    try {
+      const newTx = {
+        description: rt.description,
+        amount: rt.amount,
+        type: rt.type,
+        category: rt.category,
+        wallet: rt.wallet,
+        date: today(),
+        user_id: user.id
+      };
+      const { data } = await supabase.from("transactions").insert([newTx]).select();
+      
+      if (data) {
+        let nextDate = new Date(rt.next_run_date);
+        if (rt.frequency === 'daily') nextDate.setDate(nextDate.getDate() + 1);
+        else if (rt.frequency === 'weekly') nextDate.setDate(nextDate.getDate() + 7);
+        else if (rt.frequency === 'monthly') nextDate.setMonth(nextDate.getMonth() + 1);
+        else if (rt.frequency === '15_30') {
+          if (nextDate.getDate() <= 15) nextDate = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0);
+          else nextDate = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 15);
+        }
+
+        const nextStr = nextDate.toISOString().split('T')[0];
+        await supabase.from("recurring_transactions").update({ next_run_date: nextStr, last_run_date: today() }).eq("id", rt.id);
+        
+        setTransactions(prev => [data[0], ...prev]);
+        setUpcomingTransactions(prev => prev.filter(item => item.id !== rt.id));
+        setRecurringTransactions(prev => prev.map(item => item.id === rt.id ? { ...item, next_run_date: nextStr } : item));
+        Toast.show({ type: 'success', text1: 'Logged successfully!' });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+
+  const skipUpcomingTransaction = async (rt: RecurringTransaction) => {
+    let nextDate = new Date(rt.next_run_date);
+    if (rt.frequency === 'daily') nextDate.setDate(nextDate.getDate() + 1);
+    else if (rt.frequency === 'weekly') nextDate.setDate(nextDate.getDate() + 7);
+    else if (rt.frequency === 'monthly') nextDate.setMonth(nextDate.getMonth() + 1);
+    else if (rt.frequency === '15_30') {
+      if (nextDate.getDate() <= 15) nextDate = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0);
+      else nextDate = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 15);
+    }
+
+    const nextStr = nextDate.toISOString().split('T')[0];
+    await supabase.from("recurring_transactions").update({ next_run_date: nextStr }).eq("id", rt.id);
+    
+    setUpcomingTransactions(prev => prev.filter(item => item.id !== rt.id));
+    setRecurringTransactions(prev => prev.map(item => item.id === rt.id ? { ...item, next_run_date: nextStr } : item));
+    Toast.show({ type: 'info', text1: 'Reminder skipped' });
+  };
+
+  const processRecurringTransactions = async () => {
+    // This is now replaced by the manual 'Upcoming' workflow.
+    // We just keep the name to avoid breaking the fetchData call for now.
+    return;
   };
 
   const fetchCustomCategories = async () => {
@@ -554,9 +595,9 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
 
   return (
     <TransactionContext.Provider value={{
-      transactions, filteredTransactions, reports, savingsGoals, recurringTransactions, categories, profile, startDate, endDate, setStartDate, setEndDate,
+      transactions, filteredTransactions, reports, savingsGoals, recurringTransactions, upcomingTransactions, categories, profile, startDate, endDate, setStartDate, setEndDate,
       form, setForm, budgets, updateBudget, updateProfile, uploadAvatar, addCategory, deleteCategory, addSavingsGoal, updateSavingsGoalAmount, 
-      addRecurringTransaction, deleteRecurringTransaction, refreshData,
+      addRecurringTransaction, deleteRecurringTransaction, logUpcomingTransaction, skipUpcomingTransaction, refreshData,
       totalIncome, totalExpense, totalBudgeted, balance, walletBalances,
       categoryTotals, verdict, weeklyData, addTransaction, deleteTransaction, archiveCurrentPlan,
       showAdd, setShowAdd, selectedTransaction, setSelectedTransaction, loading, refreshing, isSubmitting

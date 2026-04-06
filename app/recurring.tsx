@@ -16,7 +16,8 @@ export default function RecurringScreen() {
     type: 'expense' as 'expense' | 'income',
     category: 'Bills',
     wallet: 'Bank' as Wallet,
-    frequency: 'monthly' as 'daily' | 'weekly' | 'monthly'
+    frequency: 'monthly' as 'daily' | 'weekly' | 'monthly' | '15_30',
+    is_business_day_adjusted: false
   });
 
   const handleAdd = async () => {
@@ -28,7 +29,15 @@ export default function RecurringScreen() {
       ...form,
       amount: parseFloat(form.amount)
     });
-    setForm({ description: '', amount: '', type: 'expense', category: 'Bills', wallet: 'Bank', frequency: 'monthly' });
+    setForm({ 
+      description: '', 
+      amount: '', 
+      type: 'expense', 
+      category: 'Bills', 
+      wallet: 'Bank', 
+      frequency: 'monthly',
+      is_business_day_adjusted: false 
+    });
     setShowAdd(false);
     Toast.show({ type: 'success', text1: 'Subscription Added!' });
   };
@@ -105,13 +114,25 @@ export default function RecurringScreen() {
 
             <Text style={styles.label}>Frequency</Text>
             <View style={styles.typeRow}>
-              {(['daily', 'weekly', 'monthly'] as const).map(f => (
+              {(['daily', 'weekly', 'monthly', '15_30'] as const).map(f => (
                 <TouchableOpacity key={f} onPress={() => setForm({ ...form, frequency: f })}
                   style={[styles.freqBtn, form.frequency === f && styles.freqBtnActive]}>
-                  <Text style={[styles.freqBtnTxt, form.frequency === f && styles.freqBtnTxtActive]}>{f}</Text>
+                  <Text style={[styles.freqBtnTxt, form.frequency === f && styles.freqBtnTxtActive]}>{f === '15_30' ? '15/30' : f}</Text>
                 </TouchableOpacity>
               ))}
             </View>
+
+            <TouchableOpacity 
+              style={styles.toggleRow} 
+              onPress={() => setForm({ ...form, is_business_day_adjusted: !form.is_business_day_adjusted })}
+            >
+              <Ionicons 
+                name={form.is_business_day_adjusted ? "checkbox" : "square-outline"} 
+                size={20} 
+                color={form.is_business_day_adjusted ? "#378ADD" : "#ccc"} 
+              />
+              <Text style={styles.toggleLabel}>Adjust for Weekends (Friday if Sat/Sun)</Text>
+            </TouchableOpacity>
 
             <View style={styles.formActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowAdd(false)}>
@@ -164,6 +185,8 @@ const styles = StyleSheet.create({
   pills: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
   pill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: "#e0e0e0" },
   pillTxt: { fontSize: 12, color: "#888", fontWeight: '600' },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4, marginBottom: 16, padding: 4 },
+  toggleLabel: { fontSize: 14, color: '#666', fontWeight: '500' },
   input: { backgroundColor: '#f5f5f5', borderRadius: 12, padding: 14, fontSize: 16, marginBottom: 12, borderWidth: 1, borderColor: '#eee' },
   formActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
   cancelBtn: { flex: 1, paddingVertical: 14, alignItems: 'center' },
