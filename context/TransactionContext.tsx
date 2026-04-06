@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import { Alert } from "react-native";
-import { CATEGORIES as DEFAULT_CATEGORIES, today } from "../constants/data";
+import { CATEGORIES as DEFAULT_CATEGORIES, today, fmt } from "../constants/data";
 import { supabase } from "../src/lib/supabase";
 import Toast from 'react-native-toast-message';
 import { useAuth } from "./AuthContext";
@@ -9,6 +9,18 @@ import { decode } from 'base64-arraybuffer';
 import * as Notifications from 'expo-notifications';
 
 export type Wallet = "Cash" | "GCash" | "Bank";
+
+export type RecurringTransaction = {
+  id: number;
+  description: string;
+  amount: number;
+  type: "expense" | "income";
+  category: string;
+  wallet: Wallet;
+  frequency: "daily" | "weekly" | "monthly";
+  next_run_date: string;
+  last_run_date: string | null;
+};
 
 export type Category = {
   id: string | number;
@@ -63,6 +75,7 @@ type ContextType = {
   filteredTransactions: Transaction[];
   reports: BudgetReport[];
   savingsGoals: SavingsGoal[];
+  recurringTransactions: RecurringTransaction[]; // NEW
   categories: Category[];
   profile: Profile | null;
   startDate: string;
@@ -87,6 +100,8 @@ type ContextType = {
   deleteCategory: (id: number | string) => Promise<void>;
   addSavingsGoal: (goal: Omit<SavingsGoal, 'id'>) => Promise<void>;
   updateSavingsGoalAmount: (id: number, amount: number, wallet: Wallet, goalName: string) => Promise<void>;
+  addRecurringTransaction: (rt: Omit<RecurringTransaction, 'id' | 'next_run_date' | 'last_run_date'>) => Promise<void>; // NEW
+  deleteRecurringTransaction: (id: number) => Promise<void>; // NEW
   refreshData: () => Promise<void>;
   totalIncome: number;
   totalExpense: number;
@@ -115,6 +130,7 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [reports, setReports]           = useState<BudgetReport[]>([]);
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
+  const [recurringTransactions, setRecurringTransactions] = useState<RecurringTransaction[]>([]); // NEW
   const [customCategories, setCustomCategories] = useState<Category[]>([]);
   const [budgets, setBudgets]           = useState<Record<string, number>>({});
   const [profile, setProfile]           = useState<Profile | null>(null);
@@ -149,8 +165,10 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
         fetchReports(), 
         fetchProfile(),
         fetchSavingsGoals(),
-        fetchCustomCategories()
+        fetchCustomCategories(),
+        fetchRecurringTransactions(), // NEW
       ]);
+      await processRecurringTransactions(); // NEW
     } catch (err) {
       console.error("Data Fetch Error:", err);
     }
@@ -179,6 +197,78 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
     setRefreshing(true);
     await fetchData();
     setRefreshing(false);
+  };
+
+  const fetchRecurringTransactions = async () => {
+    const { data } = await supabase.from("recurring_transactions").select("*").order("created_at", { ascending: false });
+    setRecurringTransactions(data || []);
+  };
+
+  const addRecurringTransaction = async (rt: any) => {
+    if (!user) return;
+    setIsSubmitting(true);
+    const { data } = await supabase.from("recurring_transactions").insert([{ ...rt, user_id: user.id }]).select();
+    if (data) setRecurringTransactions(prev => [data[0], ...prev]);
+    setIsSubmitting(false);
+  };
+
+  const deleteRecurringTransaction = async (id: number) => {
+    setIsSubmitting(true);
+    const { error } = await supabase.from("recurring_transactions").delete().eq("id", id);
+    if (!error) setRecurringTransactions(prev => prev.filter(rt => rt.id !== id));
+    setIsSubmitting(false);
+  };
+
+  const processRecurringTransactions = async () => {
+    if (!user) return;
+    const { data: recurring } = await supabase.from("recurring_transactions")
+      .select("*")
+      .lte("next_run_date", today());
+
+    if (!recurring || recurring.length === 0) return;
+
+    for (const rt of recurring) {
+      try {
+        const newTx = {
+          description: rt.description,
+          amount: rt.amount,
+          type: rt.type,
+          category: rt.category,
+          wallet: rt.wallet,
+          date: today(),
+          user_id: user.id
+        };
+        const { data: createdTx } = await supabase.from("transactions").insert([newTx]).select();
+        
+        if (createdTx) {
+          const nextRun = new Date(rt.next_run_date);
+          if (rt.frequency === 'daily') nextRun.setDate(nextRun.getDate() + 1);
+          else if (rt.frequency === 'weekly') nextRun.setDate(nextRun.getDate() + 7);
+          else if (rt.frequency === 'monthly') nextRun.setMonth(nextRun.getMonth() + 1);
+
+          const nextRunStr = nextRun.toISOString().split('T')[0];
+
+          await supabase.from("recurring_transactions")
+            .update({ last_run_date: today(), next_run_date: nextRunStr })
+            .eq("id", rt.id);
+
+          // 4. Send System Notification
+          Notifications.scheduleNotificationAsync({
+            content: {
+              title: "Auto-logged 💰",
+              body: `Processed: ${rt.description} (${fmt(rt.amount)})`,
+              sound: true,
+            },
+            trigger: null, // Trigger immediately
+          });
+
+          setTransactions(prev => [createdTx[0], ...prev]);
+          Toast.show({ type: 'success', text1: 'Auto-logged:', text2: rt.description });
+        }
+      } catch (e) {
+        console.error("Recurring Log Error:", e);
+      }
+    }
   };
 
   const fetchCustomCategories = async () => {
@@ -464,8 +554,9 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
 
   return (
     <TransactionContext.Provider value={{
-      transactions, filteredTransactions, reports, savingsGoals, categories, profile, startDate, endDate, setStartDate, setEndDate,
-      form, setForm, budgets, updateBudget, updateProfile, uploadAvatar, addCategory, deleteCategory, addSavingsGoal, updateSavingsGoalAmount, refreshData,
+      transactions, filteredTransactions, reports, savingsGoals, recurringTransactions, categories, profile, startDate, endDate, setStartDate, setEndDate,
+      form, setForm, budgets, updateBudget, updateProfile, uploadAvatar, addCategory, deleteCategory, addSavingsGoal, updateSavingsGoalAmount, 
+      addRecurringTransaction, deleteRecurringTransaction, refreshData,
       totalIncome, totalExpense, totalBudgeted, balance, walletBalances,
       categoryTotals, verdict, weeklyData, addTransaction, deleteTransaction, archiveCurrentPlan,
       showAdd, setShowAdd, selectedTransaction, setSelectedTransaction, loading, refreshing, isSubmitting
