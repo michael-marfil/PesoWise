@@ -10,7 +10,8 @@ type Props = {
 
 export default function TransactionRow({ t, onDelete, onPress }: Props) {
   const { isSubmitting } = useTransactions();
-  const cat = CATEGORIES.find(c => c.name === t.category) || CATEGORIES[5];
+  const isTransfer = t.type === 'transfer';
+  const cat = isTransfer ? { icon: "🔄", color: "#EF9F27" } : (CATEGORIES.find(c => c.name === t.category) || CATEGORIES[5]);
   
   return (
     <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
@@ -19,11 +20,17 @@ export default function TransactionRow({ t, onDelete, onPress }: Props) {
       </View>
       <View style={styles.info}>
         <Text style={styles.desc} numberOfLines={1}>{t.description}</Text>
-        <Text style={styles.meta}>{t.date} · {t.category}</Text>
+        <Text style={styles.meta}>
+          {t.date} · {isTransfer ? `${t.wallet} → ${t.to_wallet}` : t.category}
+        </Text>
       </View>
       <View style={{ alignItems: "flex-end" }}>
-        <Text style={[styles.amount, t.type === "income" && { color: "#1D9E75" }]}>
-          {t.type === "income" ? "+" : "-"}{fmt(t.amount)}
+        <Text style={[
+          styles.amount, 
+          t.type === "income" && { color: "#1D9E75" },
+          isTransfer && { color: "#EF9F27" }
+        ]}>
+          {t.type === "income" ? "+" : isTransfer ? "" : "-"}{fmt(t.amount)}
         </Text>
         <TouchableOpacity onPress={() => onDelete(t.id)} disabled={isSubmitting}>
           {isSubmitting ? (
