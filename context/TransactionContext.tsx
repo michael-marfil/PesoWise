@@ -22,10 +22,11 @@ export type Transaction = {
   id: number;
   description: string;
   amount: number;
-  type: "expense" | "income";
+  type: "expense" | "income" | "transfer";
   category: string;
   date: string;
   wallet: Wallet;
+  to_wallet?: Wallet;
   user_id: string;
 };
 
@@ -68,7 +69,15 @@ type ContextType = {
   endDate: string;
   setStartDate: (d: string) => void;
   setEndDate: (d: string) => void;
-  form: { description: string; amount: string; type: "expense" | "income"; category: string; date: string; wallet: Wallet };
+  form: { 
+    description: string; 
+    amount: string; 
+    type: "expense" | "income" | "transfer"; 
+    category: string; 
+    date: string; 
+    wallet: Wallet;
+    to_wallet: Wallet;
+  };
   setForm: (f: any) => void;
   budgets: Record<string, number>;
   updateBudget: (category: string, value: number) => void;
@@ -123,7 +132,7 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
   const [endDate, setEndDate]     = useState(lastDay);
 
   const [form, setForm] = useState({
-    description: "", amount: "", type: "expense" as "expense" | "income", category: "Food", date: today(), wallet: "Cash" as Wallet,
+    description: "", amount: "", type: "expense" as "expense" | "income" | "transfer", category: "Food", date: today(), wallet: "Cash" as Wallet, to_wallet: "GCash" as Wallet,
   });
 
   const categories = useMemo(() => {
@@ -315,8 +324,13 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
   const walletBalances = useMemo(() => {
     const map: Record<Wallet, number> = { Cash: 0, GCash: 0, Bank: 0 };
     transactions.forEach(t => {
-      const val = t.type === "income" ? t.amount : -t.amount;
-      if (map[t.wallet] !== undefined) map[t.wallet] += val;
+      if (t.type === "transfer" && t.to_wallet) {
+        map[t.wallet] -= t.amount;
+        map[t.to_wallet] += t.amount;
+      } else {
+        const val = t.type === "income" ? t.amount : -t.amount;
+        if (map[t.wallet] !== undefined) map[t.wallet] += val;
+      }
     });
     return map;
   }, [transactions]);
@@ -419,7 +433,7 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        setForm({ description: "", amount: "", type: "expense", category: "Food", date: today(), wallet: "Cash" });
+        setForm({ description: "", amount: "", type: "expense", category: "Food", date: today(), wallet: "Cash", to_wallet: "GCash" });
         Toast.show({ type: 'success', text1: 'Transaction Added' });
         onSuccess();
       } else if (error) {

@@ -13,33 +13,52 @@ type Props = {
 export default function TransactionDetailsModal({ visible, transaction, onClose }: Props) {
   if (!transaction) return null;
 
-  const cat = CATEGORIES.find(c => c.name === transaction.category) || { icon: '📦', color: '#888' };
+  const cat = transaction.type === 'transfer' 
+    ? { icon: '🔄', color: '#EF9F27' }
+    : CATEGORIES.find(c => c.name === transaction.category) || { icon: '📦', color: '#888' };
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
         <View style={styles.card}>
           <View style={[styles.iconContainer, { backgroundColor: cat.color + '20' }]}>
-            <Text style={styles.icon}>{cat.icon}</Text>
+            {transaction.type === 'transfer' ? (
+              <Ionicons name="swap-horizontal" size={32} color={cat.color} />
+            ) : (
+              <Text style={styles.icon}>{cat.icon}</Text>
+            )}
           </View>
 
           <Text style={styles.amount}>
-            {transaction.type === 'income' ? '+' : '-'}{fmt(transaction.amount)}
+            {transaction.type === 'income' ? '+' : transaction.type === 'transfer' ? '' : '-'}{fmt(transaction.amount)}
           </Text>
           <Text style={styles.description}>{transaction.description}</Text>
 
           <View style={styles.divider} />
 
-          <View style={styles.infoRow}>
-            <View style={styles.infoItem}>
-              <Text style={styles.label}>Category</Text>
-              <Text style={styles.value}>{transaction.category}</Text>
+          {transaction.type === 'transfer' ? (
+            <View style={styles.infoRow}>
+              <View style={styles.infoItem}>
+                <Text style={styles.label}>From</Text>
+                <Text style={styles.value}>{transaction.wallet}</Text>
+              </View>
+              <View style={styles.infoItem}>
+                <Text style={styles.label}>To</Text>
+                <Text style={styles.value}>{transaction.to_wallet}</Text>
+              </View>
             </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.label}>Wallet</Text>
-              <Text style={styles.value}>{transaction.wallet}</Text>
+          ) : (
+            <View style={styles.infoRow}>
+              <View style={styles.infoItem}>
+                <Text style={styles.label}>Category</Text>
+                <Text style={styles.value}>{transaction.category}</Text>
+              </View>
+              <View style={styles.infoItem}>
+                <Text style={styles.label}>Wallet</Text>
+                <Text style={styles.value}>{transaction.wallet}</Text>
+              </View>
             </View>
-          </View>
+          )}
 
           <View style={styles.infoRow}>
             <View style={styles.infoItem}>
@@ -48,7 +67,10 @@ export default function TransactionDetailsModal({ visible, transaction, onClose 
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.label}>Type</Text>
-              <Text style={[styles.value, { color: transaction.type === 'income' ? '#1D9E75' : '#E24B4A', textTransform: 'capitalize' }]}>
+              <Text style={[styles.value, { 
+                color: transaction.type === 'income' ? '#1D9E75' : transaction.type === 'transfer' ? '#EF9F27' : '#E24B4A', 
+                textTransform: 'capitalize' 
+              }]}>
                 {transaction.type}
               </Text>
             </View>
