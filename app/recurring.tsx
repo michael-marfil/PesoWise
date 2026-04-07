@@ -2,12 +2,11 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { Stack } from 'expo-router';
 import { useTransactions, Wallet } from '../context/TransactionContext';
-import { fmt } from '../constants/data';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 
 export default function RecurringScreen() {
-  const { recurringTransactions, categories, addRecurringTransaction, deleteRecurringTransaction, isSubmitting } = useTransactions();
+  const { recurringTransactions, categories, addRecurringTransaction, deleteRecurringTransaction, isSubmitting, fmt } = useTransactions();
   
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({

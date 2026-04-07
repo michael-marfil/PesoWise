@@ -12,9 +12,10 @@ type Props = {
 };
 
 export default function AddModal({ visible, form, onFormChange, onSubmit, onClose, isSubmitting }: Props) {
-  const { categories } = useTransactions();
-
-  const wallets: Wallet[] = ["Cash", "GCash", "Bank"];
+  const { categories, wallets, editingId } = useTransactions();
+  
+  // Convert WalletObject[] to string names for the UI buttons
+  const walletNames = wallets.length > 0 ? wallets.map(w => w.name) : ["Cash", "GCash", "Bank"];
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -23,7 +24,7 @@ export default function AddModal({ visible, form, onFormChange, onSubmit, onClos
           <View style={styles.handle} />
           
           <View style={styles.headerRow}>
-            <Text style={styles.title}>Add Transaction</Text>
+            <Text style={styles.title}>{editingId ? 'Edit Transaction' : 'Add Transaction'}</Text>
           </View>
 
           <View style={styles.typeRow}>
@@ -45,8 +46,8 @@ export default function AddModal({ visible, form, onFormChange, onSubmit, onClos
           <View style={styles.walletRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.label}>{form.type === 'transfer' ? 'From' : 'Wallet'}</Text>
-              <View style={{ flexDirection: 'row', gap: 6 }}>
-                {wallets.map(w => (
+              <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                {walletNames.map(w => (
                   <TouchableOpacity key={w} onPress={() => onFormChange({ ...form, wallet: w })}
                     style={[styles.walletBtn, form.wallet === w && styles.walletBtnActive]}
                     disabled={isSubmitting}>
@@ -61,8 +62,8 @@ export default function AddModal({ visible, form, onFormChange, onSubmit, onClos
             <View style={[styles.walletRow, { marginTop: -8 }]}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>To</Text>
-                <View style={{ flexDirection: 'row', gap: 6 }}>
-                  {wallets.map(w => (
+                <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                  {walletNames.map(w => (
                     <TouchableOpacity key={w} onPress={() => onFormChange({ ...form, to_wallet: w })}
                       style={[styles.walletBtn, form.to_wallet === w && { borderColor: '#EF9F27', backgroundColor: '#FFF7E6' }]}
                       disabled={isSubmitting || form.wallet === w}>
@@ -92,7 +93,7 @@ export default function AddModal({ visible, form, onFormChange, onSubmit, onClos
           <TextInput style={styles.input} placeholder="Date (YYYY-MM-DD)" value={form.date} onChangeText={v => onFormChange({ ...form, date: v })} editable={!isSubmitting} />
 
           <TouchableOpacity style={[styles.submit, isSubmitting && { backgroundColor: '#aaa' }]} onPress={onSubmit} disabled={isSubmitting}>
-            {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitTxt}>Add Transaction</Text>}
+            {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitTxt}>{editingId ? 'Save Changes' : 'Add Transaction'}</Text>}
           </TouchableOpacity>
         </TouchableOpacity>
       </TouchableOpacity>
@@ -111,7 +112,7 @@ const styles = StyleSheet.create({
   typeBtn:  { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 2, borderColor: "#e0e0e0", alignItems: "center" },
   typeTxt:  { fontSize: 14, color: "#888", textTransform: 'capitalize' },
   walletRow:{ flexDirection: 'row', gap: 8, marginBottom: 16 },
-  walletBtn:{ flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#eee', backgroundColor: '#f9f9f9', alignItems: 'center' },
+  walletBtn:{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#eee', backgroundColor: '#f9f9f9', alignItems: 'center', minWidth: 70 },
   walletBtnActive: { borderColor: '#378ADD', backgroundColor: '#E6F1FB' },
   walletTxt: { fontSize: 12, color: '#888', fontWeight: '500' },
   walletTxtActive: { color: '#378ADD', fontWeight: '700' },

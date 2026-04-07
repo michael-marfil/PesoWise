@@ -7,7 +7,7 @@ export const CATEGORIES = [
   { name: "Others",    icon: "📦", color: "#888780" },
 ];
 
-export const fmt = (n: number) =>
-  "₱" + Number(n).toLocaleString("en-PH", { minimumFractionDigits: 0 });
+export const fmt = (n: number, symbol: string = "₱") =>
+  symbol + Number(n).toLocaleString("en-PH", { minimumFractionDigits: 0 });
 
 export const today = () => new Date().toISOString().split("T")[0];

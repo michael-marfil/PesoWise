@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import { Alert } from "react-native";
-import { CATEGORIES as DEFAULT_CATEGORIES, today, fmt } from "../constants/data";
+import { CATEGORIES as DEFAULT_CATEGORIES, today, fmt as baseFmt } from "../constants/data";
 import { supabase } from "../src/lib/supabase";
 import Toast from 'react-native-toast-message';
 import { useAuth } from "./AuthContext";
@@ -8,7 +8,14 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
 import * as Notifications from 'expo-notifications';
 
-export type Wallet = "Cash" | "GCash" | "Bank";
+export type Wallet = string;
+
+export type WalletObject = {
+  id: number;
+  name: string;
+  icon: string;
+  color: string;
+};
 
 export type RecurringTransaction = {
   id: number;
@@ -76,7 +83,9 @@ type ContextType = {
   filteredTransactions: Transaction[];
   reports: BudgetReport[];
   savingsGoals: SavingsGoal[];
-  recurringTransactions: RecurringTransaction[]; // NEW
+  recurringTransactions: RecurringTransaction[];
+  upcomingTransactions: RecurringTransaction[];
+  wallets: WalletObject[];
   categories: Category[];
   profile: Profile | null;
   startDate: string;
@@ -101,16 +110,22 @@ type ContextType = {
   deleteCategory: (id: number | string) => Promise<void>;
   addSavingsGoal: (goal: Omit<SavingsGoal, 'id'>) => Promise<void>;
   updateSavingsGoalAmount: (id: number, amount: number, wallet: Wallet, goalName: string) => Promise<void>;
+  addWallet: (name: string, icon: string, color: string) => Promise<void>;
+  deleteWallet: (id: number) => Promise<void>;
   addRecurringTransaction: (rt: any) => Promise<void>;
   deleteRecurringTransaction: (id: number) => Promise<void>;
   logUpcomingTransaction: (rt: RecurringTransaction) => Promise<void>;
   skipUpcomingTransaction: (rt: RecurringTransaction) => Promise<void>;
+  updateTransaction: (id: number, updates: Partial<Transaction>, onSuccess: () => void) => Promise<void>;
   refreshData: () => Promise<void>;
+  currency: string;
+  setCurrency: (symbol: string) => Promise<void>;
+  fmt: (n: number) => string;
   totalIncome: number;
   totalExpense: number;
   totalBudgeted: number;
   balance: number;
-  walletBalances: Record<Wallet, number>;
+  walletBalances: Record<string, number>;
   categoryTotals: { name: string; icon: string; color: string; spent: number; budget: number }[];
   verdict: { title: string; message: string; color: string };
   weeklyData: { day: string; amount: number }[];
@@ -119,8 +134,10 @@ type ContextType = {
   archiveCurrentPlan: () => Promise<void>;
   showAdd: boolean;
   setShowAdd: (v: boolean) => void;
-  selectedTransaction: Transaction | null; // NEW
-  setSelectedTransaction: (t: Transaction | null) => void; // NEW
+  selectedTransaction: Transaction | null;
+  setSelectedTransaction: (t: Transaction | null) => void;
+  editingId: number | null;
+  setEditingId: (id: number | null) => void;
   loading: boolean;
   refreshing: boolean;
   isSubmitting: boolean;
@@ -134,12 +151,15 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
   const [reports, setReports]           = useState<BudgetReport[]>([]);
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
   const [recurringTransactions, setRecurringTransactions] = useState<RecurringTransaction[]>([]);
-  const [upcomingTransactions, setUpcomingTransactions] = useState<RecurringTransaction[]>([]); // Initialize here
+  const [upcomingTransactions, setUpcomingTransactions] = useState<RecurringTransaction[]>([]);
+  const [wallets, setWallets]             = useState<WalletObject[]>([]);
   const [customCategories, setCustomCategories] = useState<Category[]>([]);
   const [budgets, setBudgets]           = useState<Record<string, number>>({});
   const [profile, setProfile]           = useState<Profile | null>(null);
+  const [currency, setCurrencyState]    = useState("₱");
   const [showAdd, setShowAdd]           = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null); // NEW
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [editingId, setEditingId]           = useState<number | null>(null);
   const [loading, setLoading]           = useState(true);
   const [refreshing, setRefreshing]     = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -154,6 +174,8 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
   const [form, setForm] = useState({
     description: "", amount: "", type: "expense" as "expense" | "income" | "transfer", category: "Food", date: today(), wallet: "Cash" as Wallet, to_wallet: "GCash" as Wallet,
   });
+
+  const fmt = (n: number) => baseFmt(n, currency);
 
   const categories = useMemo(() => {
     const defaults = DEFAULT_CATEGORIES.map((c, i) => ({ ...c, id: `def-${i}`, is_default: true }));
@@ -170,9 +192,9 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
         fetchProfile(),
         fetchSavingsGoals(),
         fetchCustomCategories(),
-        fetchRecurringTransactions(), // NEW
+        fetchRecurringTransactions(),
+        fetchWallets(),
       ]);
-      await processRecurringTransactions(); // NEW
     } catch (err) {
       console.error("Data Fetch Error:", err);
     }
@@ -193,6 +215,7 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
       setProfile(null);
       setSavingsGoals([]);
       setCustomCategories([]);
+      setWallets([]);
       setLoading(false);
     }
   }, [user, authLoading]);
@@ -201,6 +224,42 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
     setRefreshing(true);
     await fetchData();
     setRefreshing(false);
+  };
+
+  const fetchWallets = async () => {
+    const { data } = await supabase.from("wallets").select("*").order("name", { ascending: true });
+    setWallets(data || []);
+  };
+
+  const addWallet = async (name: string, icon: string, color: string) => {
+    if (!user) return;
+    setIsSubmitting(true);
+    try {
+      const { data, error } = await supabase.from("wallets").insert([{ name, icon, color, user_id: user.id }]).select();
+      if (error) throw error;
+      if (data) {
+        setWallets(prev => [...prev, data[0]]);
+        Toast.show({ type: 'success', text1: 'Wallet Added' });
+      }
+    } catch (e: any) {
+      Alert.alert("Failed to add wallet", e.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const deleteWallet = async (id: number) => {
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.from("wallets").delete().eq("id", id);
+      if (error) throw error;
+      setWallets(prev => prev.filter(w => w.id !== id));
+      Toast.show({ type: 'info', text1: 'Wallet Removed' });
+    } catch (e: any) {
+      Alert.alert("Failed to remove wallet", e.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const fetchRecurringTransactions = async () => {
@@ -217,11 +276,10 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.from("recurring_transactions").insert([{ 
         ...rt, 
         user_id: user.id,
-        next_run_date: today() // Ensure it starts today
+        next_run_date: today() 
       }]).select();
       
       if (error) {
-        console.error("Supabase Error:", error);
         Alert.alert("Failed to save", error.message);
         return;
       }
@@ -256,8 +314,8 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
       
       if (rt.is_business_day_adjusted) {
         const day = targetDate.getDay(); 
-        if (day === 0) targetDate.setDate(targetDate.getDate() - 2); // Sun -> Fri
-        else if (day === 6) targetDate.setDate(targetDate.getDate() - 1); // Sat -> Fri
+        if (day === 0) targetDate.setDate(targetDate.getDate() - 2); 
+        else if (day === 6) targetDate.setDate(targetDate.getDate() - 1); 
       }
 
       const finalTargetStr = targetDate.toISOString().split('T')[0];
@@ -322,12 +380,6 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
     Toast.show({ type: 'info', text1: 'Reminder skipped' });
   };
 
-  const processRecurringTransactions = async () => {
-    // This is now replaced by the manual 'Upcoming' workflow.
-    // We just keep the name to avoid breaking the fetchData call for now.
-    return;
-  };
-
   const fetchCustomCategories = async () => {
     const { data } = await supabase.from("categories").select("*").order("id", { ascending: true });
     if (data) setCustomCategories(data.map(c => ({ ...c, is_default: false })));
@@ -358,9 +410,11 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
   const fetchProfile = async () => {
     if (!user) return;
     const { data } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
-    if (data) setProfile(data);
-    else {
-      const newProfile = { id: user.id, full_name: user.email?.split('@')[0] || "User", currency: "PHP" };
+    if (data) {
+      setProfile(data);
+      if (data.currency) setCurrencyState(data.currency);
+    } else {
+      const newProfile = { id: user.id, full_name: user.email?.split('@')[0] || "User", currency: "₱" };
       const { data: created } = await supabase.from("profiles").insert([newProfile]).select().single();
       if (created) setProfile(created);
     }
@@ -375,6 +429,12 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
       Toast.show({ type: 'success', text1: 'Profile Updated' });
     }
     setIsSubmitting(false);
+  };
+
+  const setCurrency = async (symbol: string) => {
+    if (!user) return;
+    setCurrencyState(symbol);
+    await updateProfile({ currency: symbol });
   };
 
   const uploadAvatar = async (uri: string) => {
@@ -469,18 +529,22 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
   const totalBudgeted = useMemo(() => Object.values(budgets).reduce((s, v) => s + v, 0), [budgets]);
 
   const walletBalances = useMemo(() => {
-    const map: Record<Wallet, number> = { Cash: 0, GCash: 0, Bank: 0 };
+    const map: Record<string, number> = {};
+    wallets.forEach(w => { map[w.name] = 0; });
+    
     transactions.forEach(t => {
+      if (map[t.wallet] === undefined) map[t.wallet] = 0;
       if (t.type === "transfer" && t.to_wallet) {
+        if (map[t.to_wallet] === undefined) map[t.to_wallet] = 0;
         map[t.wallet] -= t.amount;
         map[t.to_wallet] += t.amount;
       } else {
         const val = t.type === "income" ? t.amount : -t.amount;
-        if (map[t.wallet] !== undefined) map[t.wallet] += val;
+        map[t.wallet] += val;
       }
     });
     return map;
-  }, [transactions]);
+  }, [transactions, wallets]);
 
   const categoryTotals = useMemo(() => {
     const map: Record<string, number> = {};
@@ -591,6 +655,23 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateTransaction = async (id: number, updates: Partial<Transaction>, onSuccess: () => void) => {
+    if (!user) return;
+    setIsSubmitting(true);
+    try {
+      const { data, error } = await supabase.from("transactions").update(updates).eq("id", id).select();
+      if (!error && data) {
+        setTransactions(prev => prev.map(t => t.id === id ? data[0] : t));
+        Toast.show({ type: 'success', text1: 'Transaction Updated' });
+        onSuccess();
+      } else if (error) {
+        Alert.alert("Update Failed", error.message);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const deleteTransaction = (id: number) => {
     Alert.alert("Delete", "Remove this?", [
       { text: "Cancel" },
@@ -611,12 +692,13 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
 
   return (
     <TransactionContext.Provider value={{
-      transactions, filteredTransactions, reports, savingsGoals, recurringTransactions, upcomingTransactions, categories, profile, startDate, endDate, setStartDate, setEndDate,
+      transactions, filteredTransactions, reports, savingsGoals, recurringTransactions, upcomingTransactions, wallets, categories, profile, startDate, endDate, setStartDate, setEndDate,
       form, setForm, budgets, updateBudget, updateProfile, uploadAvatar, addCategory, deleteCategory, addSavingsGoal, updateSavingsGoalAmount, 
-      addRecurringTransaction, deleteRecurringTransaction, logUpcomingTransaction, skipUpcomingTransaction, refreshData,
+      addWallet, deleteWallet, addRecurringTransaction, deleteRecurringTransaction, logUpcomingTransaction, skipUpcomingTransaction, updateTransaction, refreshData,
+      currency, setCurrency, fmt,
       totalIncome, totalExpense, totalBudgeted, balance, walletBalances,
       categoryTotals, verdict, weeklyData, addTransaction, deleteTransaction, archiveCurrentPlan,
-      showAdd, setShowAdd, selectedTransaction, setSelectedTransaction, loading, refreshing, isSubmitting
+      showAdd, setShowAdd, selectedTransaction, setSelectedTransaction, editingId, setEditingId, loading, refreshing, isSubmitting
     }}>
       {children}
     </TransactionContext.Provider>

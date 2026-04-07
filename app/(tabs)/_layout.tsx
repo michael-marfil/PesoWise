@@ -7,8 +7,31 @@ import AddModal from "../../components/AddModal";
 import { useTransactions } from "../../context/TransactionContext";
 
 export default function TabLayout() {
-  const { showAdd, setShowAdd, form, setForm, addTransaction, isSubmitting } = useTransactions();
+  const { showAdd, setShowAdd, form, setForm, addTransaction, updateTransaction, isSubmitting, editingId, setEditingId } = useTransactions();
   const insets = useSafeAreaInsets();
+
+  const handleClose = () => {
+    setShowAdd(false);
+    setEditingId(null);
+    setForm({ 
+      description: "", 
+      amount: "", 
+      type: "expense", 
+      category: "Food", 
+      date: new Date().toISOString().split('T')[0], 
+      wallet: "Cash", 
+      to_wallet: "GCash" 
+    });
+  };
+
+  const handleSubmit = () => {
+    const onSuccess = () => handleClose();
+    if (editingId) {
+      updateTransaction(editingId, { ...form, amount: parseFloat(form.amount) }, onSuccess);
+    } else {
+      addTransaction(onSuccess);
+    }
+  };
 
   return (
     <>
@@ -70,8 +93,8 @@ export default function TabLayout() {
         visible={showAdd}
         form={form}
         onFormChange={setForm}
-        onSubmit={() => addTransaction(() => setShowAdd(false))}
-        onClose={() => setShowAdd(false)}
+        onSubmit={handleSubmit}
+        onClose={handleClose}
         isSubmitting={isSubmitting}
       />
     </>

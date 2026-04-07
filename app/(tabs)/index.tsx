@@ -2,13 +2,12 @@ import { StatusBar } from "expo-status-bar";
 import { ScrollView, StyleSheet, Text, View, RefreshControl, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BalanceCard from "../../components/BalanceCard";
-import { CategoryLegend, DonutChart, MiniBarChart } from "../../components/Charts";
+import { CategoryLegend, DonutChart, MiniBarChart, TopExpensesList } from "../../components/Charts";
 import Header from "../../components/Header";
 import TransactionRow from "../../components/TransactionRow";
 import TransactionDetailsModal from "../../components/TransactionDetailsModal";
 import { useTransactions } from "../../context/TransactionContext";
 import { Ionicons } from "@expo/vector-icons";
-import { fmt } from "../../constants/data";
 
 export default function OverviewScreen() {
   const { 
@@ -16,7 +15,8 @@ export default function OverviewScreen() {
     filteredTransactions, deleteTransaction, setShowAdd, verdict, 
     startDate, endDate, walletBalances, refreshData, refreshing,
     selectedTransaction, setSelectedTransaction,
-    upcomingTransactions, logUpcomingTransaction, skipUpcomingTransaction 
+    upcomingTransactions, logUpcomingTransaction, skipUpcomingTransaction,
+    fmt 
   } = useTransactions();
 
   const pieData = categoryTotals.filter(c => c.spent > 0);
@@ -70,10 +70,15 @@ export default function OverviewScreen() {
           <Text style={styles.verdictMsg}>{verdict.message}</Text>
         </View>
 
-        <Text style={styles.section}>Spending by Category</Text>
-        <Text style={styles.rangeSub}>{startDate} to {endDate}</Text>
-        <DonutChart data={pieData} />
-        <CategoryLegend data={pieData} />
+        <View style={styles.sectionHeader}>
+          <Text style={styles.section}>Spending by Category</Text>
+          <Text style={styles.rangeSub}>{startDate} to {endDate}</Text>
+        </View>
+        
+        <View style={styles.chartContainer}>
+          <DonutChart data={pieData} />
+          <TopExpensesList data={pieData} />
+        </View>
 
         <Text style={[styles.section, { marginTop: 20 }]}>Weekly Spending</Text>
         <MiniBarChart data={weeklyData} />
@@ -103,8 +108,16 @@ export default function OverviewScreen() {
 const styles = StyleSheet.create({
   safe:    { flex: 1, backgroundColor: "#fff" },
   scroll:  { flex: 1, paddingHorizontal: 20 },
-  section: { fontSize: 14, fontWeight: "600", color: "#111", marginBottom: 4, marginTop: 10 },
-  rangeSub: { fontSize: 11, color: '#aaa', marginBottom: 10, fontWeight: '500' },
+  sectionHeader: { marginBottom: 10 },
+  section: { fontSize: 14, fontWeight: "700", color: "#111", marginBottom: 2, marginTop: 10 },
+  rangeSub: { fontSize: 11, color: '#aaa', fontWeight: '500' },
+  chartContainer: {
+    backgroundColor: '#fcfcfc',
+    borderRadius: 24,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
   verdictCard: {
     padding: 16,
     borderRadius: 16,

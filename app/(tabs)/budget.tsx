@@ -2,45 +2,42 @@ import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator, Alert, Modal, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { fmt } from "../../constants/data";
-import { useTransactions, Wallet } from "../../context/TransactionContext";
-import { Ionicons } from '@expo/vector-icons';
+import { Category, useTransactions, Wallet } from "../../context/TransactionContext";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function BudgetScreen() {
-  const { categoryTotals, updateBudget, totalIncome, totalBudgeted, isSubmitting, endDate, archiveCurrentPlan, savingsGoals, addSavingsGoal, updateSavingsGoalAmount, refreshData, refreshing } = useTransactions();
+  const { categoryTotals, updateBudget, totalIncome, totalBudgeted, isSubmitting, endDate, archiveCurrentPlan, savingsGoals, addSavingsGoal, updateSavingsGoalAmount, refreshData, refreshing, wallets, fmt } = useTransactions();
   
-  const [editBudget, setEditBudget]     = useState<string | null>(null);
-  const [budgetInput, setBudgetInput]   = useState("");
+  const [editing, setEditing] = useState<string | null>(null);
+  const [tempVal, setTempVal] = useState("");
 
   const [showGoalModal, setShowGoalModal] = useState(false);
-  const [goalName, setGoalName]           = useState("");
-  const [goalTarget, setGoalTarget]       = useState("");
-  
-  const [depositModal, setDepositModal]   = useState<{ id: number, name: string, current: number } | null>(null);
-  const [depositAmt, setDepositAmt]       = useState("");
-  const [depositWallet, setDepositWallet] = useState<Wallet>("Cash");
+  const [goalName, setGoalName] = useState("");
+  const [goalTarget, setGoalTarget] = useState("");
+
+  const [depositModal, setDepositModal] = useState<any>(null);
+  const [depositAmt, setDepositAmt] = useState("");
+  const [depositWallet, setDepositWallet] = useState<string>("Cash");
 
   const unallocated = totalIncome - totalBudgeted;
-  const isRangeFinished = new Date().toISOString().split('T')[0] >= endDate;
 
-  const onArchivePress = () => {
-    Alert.alert("Archive Plan", "Save this cycle to history?", [
-      { text: "Cancel" },
-      { text: "Archive", onPress: archiveCurrentPlan }
-    ]);
+  const onSave = (category: string) => {
+    updateBudget(category, parseFloat(tempVal) || 0);
+    setEditing(null);
   };
 
-  const handleCreateGoal = async () => {
+  const handleAddGoal = async () => {
     if (!goalName || !goalTarget) return;
     await addSavingsGoal({ name: goalName, target_amount: parseFloat(goalTarget), current_amount: 0, icon: "🎯" });
     setShowGoalModal(false);
-    setGoalName(""); setGoalTarget("");
+    setGoalName("");
+    setGoalTarget("");
   };
 
   const handleDeposit = async () => {
-    if (!depositModal || !depositAmt) return;
-    const newTotal = depositModal.current + parseFloat(depositAmt);
-    // PASS: new total, source wallet, and goal name for the transaction record
+    if (!depositAmt || !depositModal) return;
+    const newTotal = depositModal.current_amount + parseFloat(depositAmt);
+    // Use the goal name for the transaction record
     await updateSavingsGoalAmount(depositModal.id, newTotal, depositWallet, depositModal.name);
     setDepositModal(null);
     setDepositAmt("");
@@ -50,158 +47,145 @@ export default function BudgetScreen() {
     <SafeAreaView style={styles.safe}>
       <StatusBar style="dark" />
       <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Budget & Goals</Text>
-          <Text style={styles.subtitle}>Plan your finances</Text>
-        </View>
-        {isRangeFinished && (
-          <TouchableOpacity style={styles.archiveBtn} onPress={onArchivePress} disabled={isSubmitting}>
-            <Text style={styles.archiveBtnTxt}>Archive</Text>
-          </TouchableOpacity>
-        )}
+        <Text style={styles.title}>Budgeting</Text>
+        <TouchableOpacity style={styles.archiveBtn} onPress={archiveCurrentPlan}>
+          <Ionicons name="archive-outline" size={18} color="#378ADD" />
+          <Text style={styles.archiveText}>Archive Month</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView 
         style={styles.scroll} 
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={refreshData} colors={["#378ADD"]} tintColor="#378ADD" />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshData} colors={["#378ADD"]} />}
       >
-        {/* Summary Card */}
+        {/* SUMMARY CARD */}
         <View style={styles.summaryCard}>
           <View style={styles.summaryRow}>
             <View>
-              <Text style={styles.summaryLabel}>Total Income</Text>
+              <Text style={styles.summaryLabel}>ESTIMATED INCOME</Text>
               <Text style={styles.summaryVal}>{fmt(totalIncome)}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.summaryLabel}>Total Budgeted</Text>
+              <Text style={styles.summaryLabel}>TOTAL BUDGETED</Text>
               <Text style={styles.summaryVal}>{fmt(totalBudgeted)}</Text>
             </View>
           </View>
           <View style={styles.divider} />
           <View style={styles.summaryRow}>
-            <Text style={styles.unallocatedLabel}>Remaining to Allocate</Text>
-            <Text style={[styles.unallocatedVal, unallocated < 0 && { color: '#FFBABA' }]}>
+            <Text style={styles.unallocatedLabel}>UNALLOCATED</Text>
+            <Text style={[styles.unallocatedVal, unallocated < 0 && { color: "#E24B4A" }]}>
               {fmt(unallocated)}
             </Text>
           </View>
         </View>
 
-        {/* Savings Goals Section */}
+        {/* SAVINGS GOALS SECTION */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Savings Goals 🐷</Text>
+          <Text style={styles.sectionTitle}>Savings Goals</Text>
           <TouchableOpacity onPress={() => setShowGoalModal(true)}>
-            <Text style={styles.addGoalBtn}>+ New Goal</Text>
+            <Text style={styles.addBtn}>+ New Goal</Text>
           </TouchableOpacity>
         </View>
 
-        {savingsGoals.length === 0 && (
-          <View style={styles.emptyGoal}>
-            <Text style={styles.emptyGoalText}>No goals yet. Set one to start saving!</Text>
-          </View>
-        )}
-
-        {savingsGoals.map(g => {
-          const pct = Math.min((g.current_amount / g.target_amount) * 100, 100);
-          return (
-            <View key={g.id} style={styles.goalCard}>
-              <View style={styles.cardRow}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <View style={styles.goalIcon}><Text style={{ fontSize: 18 }}>{g.icon}</Text></View>
-                  <View>
-                    <Text style={styles.goalName}>{g.name}</Text>
-                    <Text style={styles.goalTarget}>{fmt(g.current_amount)} of {fmt(g.target_amount)}</Text>
-                  </View>
-                </View>
-                <TouchableOpacity 
-                  style={styles.depositBtn} 
-                  onPress={() => setDepositModal({ id: g.id, name: g.name, current: g.current_amount })}
-                >
-                  <Text style={styles.depositText}>Deposit</Text>
-                </TouchableOpacity>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.goalsList}>
+          {savingsGoals.map(g => (
+            <TouchableOpacity key={g.id} style={styles.goalCard} onPress={() => setDepositModal(g)}>
+              <View style={styles.goalIcon}><Text style={{ fontSize: 20 }}>{g.icon}</Text></View>
+              <Text style={styles.goalName}>{g.name}</Text>
+              <Text style={styles.goalTarget}>{fmt(g.current_amount)} of {fmt(g.target_amount)}</Text>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${Math.min((g.current_amount/g.target_amount)*100, 100)}%` }]} />
               </View>
-              <View style={styles.progressBg}>
-                <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: '#1D9E75' }]} />
-              </View>
-            </View>
-          );
-        })}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
-        {/* Category Budgets Section */}
-        <Text style={[styles.sectionTitle, { marginTop: 20, marginBottom: 15 }]}>Category Budgets</Text>
+        {/* CATEGORY BUDGETS */}
+        <Text style={[styles.sectionTitle, { marginTop: 25, marginBottom: 15 }]}>Monthly Budgets</Text>
         {categoryTotals.map(c => {
-          const pct  = c.budget > 0 ? Math.min((c.spent / c.budget) * 100, 100) : 0;
           const over = c.spent > c.budget && c.budget > 0;
           return (
-            <TouchableOpacity key={c.name} style={styles.card} onPress={() => { setEditBudget(editBudget === c.name ? null : c.name); setBudgetInput(String(c.budget)); }}>
-              <View style={styles.cardRow}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <Text style={{ fontSize: 20 }}>{c.icon}</Text>
+            <View key={c.id} style={styles.catCard}>
+              <View style={styles.catInfo}>
+                <View style={[styles.iconBox, { backgroundColor: c.color + '15' }]}>
+                  <Text style={{ fontSize: 18 }}>{c.icon}</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={styles.catName}>{c.name}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+                    <Text style={[styles.spent, over && { color: "#E24B4A" }]}>{fmt(c.spent)}</Text>
+                    <Text style={styles.budgetOf}>/ {fmt(c.budget)}</Text>
+                  </View>
                 </View>
-                <View style={{ alignItems: "flex-end" }}>
-                  <Text style={[styles.spent, over && { color: "#E24B4A" }]}>{fmt(c.spent)}</Text>
-                  <Text style={styles.budgetOf}>/ {fmt(c.budget)}</Text>
-                </View>
-              </View>
-              <View style={styles.progressBg}>
-                <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: over ? "#E24B4A" : c.color }]} />
-              </View>
-              {editBudget === c.name && (
-                <View style={{ flexDirection: "row", gap: 8, marginTop: 15 }}>
-                  <TextInput style={styles.input} keyboardType="numeric" value={budgetInput} onChangeText={setBudgetInput} autoFocus />
-                  <TouchableOpacity style={[styles.saveBtn, { backgroundColor: c.color }]} onPress={() => { updateBudget(c.name, parseFloat(budgetInput) || 0); setEditBudget(null); }}>
-                    {isSubmitting ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.btnTextSmall}>Save</Text>}
+                
+                {editing === c.name ? (
+                  <View style={styles.editRow}>
+                    <TextInput 
+                      style={styles.budgetInput} 
+                      autoFocus keyboardType="numeric" 
+                      defaultValue={c.budget.toString()} 
+                      onChangeText={setTempVal} 
+                    />
+                    <TouchableOpacity onPress={() => onSave(c.name)}>
+                      <Ionicons name="checkmark-circle" size={28} color="#1D9E75" />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity style={styles.editIcon} onPress={() => { setEditing(c.name); setTempVal(c.budget.toString()); }}>
+                    <Ionicons name="pencil-outline" size={16} color="#aaa" />
                   </TouchableOpacity>
-                </View>
-              )}
-            </TouchableOpacity>
+                )}
+              </View>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { backgroundColor: c.color, width: `${Math.min((c.spent/c.budget)*100, 100)}%` }]} />
+              </View>
+            </View>
           );
         })}
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Goal Modal */}
+      {/* NEW GOAL MODAL */}
       <Modal visible={showGoalModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>New Savings Goal</Text>
-            <TextInput style={styles.modalInput} placeholder="What are you saving for?" value={goalName} onChangeText={setGoalName} />
-            <TextInput style={styles.modalInput} placeholder="Target Amount (₱)" keyboardType="numeric" value={goalTarget} onChangeText={setGoalTarget} />
-            <View style={styles.modalRow}>
+            <TextInput style={styles.input} placeholder="Goal Name (e.g. New iPhone)" value={goalName} onChangeText={setGoalName} />
+            <TextInput style={styles.input} placeholder="Target Amount (₱)" keyboardType="numeric" value={goalTarget} onChangeText={setGoalTarget} />
+            <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowGoalModal(false)}><Text>Cancel</Text></TouchableOpacity>
-              <TouchableOpacity style={styles.confirmBtn} onPress={handleCreateGoal}><Text style={{ color: '#fff', fontWeight: '700' }}>Create</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.confirmBtn} onPress={handleAddGoal}><Text style={{ color: '#fff', fontWeight: '700' }}>Create Goal</Text></TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* Deposit Modal */}
+      {/* DEPOSIT MODAL */}
       <Modal visible={!!depositModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Deposit to {depositModal?.name}</Text>
+            <Text style={styles.modalTitle}>Save for {depositModal?.name}</Text>
+            <TextInput style={styles.input} placeholder="Amount to Save (₱)" keyboardType="numeric" value={depositAmt} onChangeText={setDepositAmt} autoFocus />
             
             <Text style={styles.subLabel}>Deduct from wallet:</Text>
             <View style={styles.walletPicker}>
-              {(["Cash", "GCash", "Bank"] as Wallet[]).map(w => (
-                <TouchableOpacity 
-                  key={w} 
-                  onPress={() => setDepositWallet(w)}
-                  style={[styles.miniWalletBtn, depositWallet === w && styles.miniWalletBtnActive]}
-                >
-                  <Text style={[styles.miniWalletText, depositWallet === w && styles.miniWalletTextActive]}>{w}</Text>
-                </TouchableOpacity>
-              ))}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {(wallets.length > 0 ? wallets.map(w => w.name) : ["Cash", "GCash", "Bank"]).map(w => (
+                  <TouchableOpacity 
+                    key={w} 
+                    onPress={() => setDepositWallet(w)}
+                    style={[styles.miniWalletBtn, depositWallet === w && styles.miniWalletBtnActive, { marginRight: 8, paddingHorizontal: 15 }]}
+                  >
+                    <Text style={[styles.miniWalletText, depositWallet === w && styles.miniWalletTextActive]}>{w}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
 
-            <TextInput style={styles.modalInput} placeholder="Amount to add (₱)" keyboardType="numeric" value={depositAmt} onChangeText={setDepositAmt} autoFocus />
-            
-            <View style={styles.modalRow}>
+            <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setDepositModal(null)}><Text>Cancel</Text></TouchableOpacity>
-              <TouchableOpacity style={[styles.confirmBtn, { backgroundColor: '#1D9E75' }]} onPress={handleDeposit}><Text style={{ color: '#fff', fontWeight: '700' }}>Confirm</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.confirmBtn} onPress={handleDeposit}><Text style={{ color: '#fff', fontWeight: '700' }}>Confirm Savings</Text></TouchableOpacity>
             </View>
           </View>
         </View>
@@ -212,51 +196,48 @@ export default function BudgetScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#fff" },
-  header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 24, fontWeight: "800", color: "#111" },
-  subtitle: { fontSize: 14, color: "#888", marginTop: 2 },
-  archiveBtn: { backgroundColor: '#E1F5EE', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#1D9E75' },
-  archiveBtnTxt: { color: '#0F6E56', fontSize: 12, fontWeight: '700' },
-  summaryCard: { backgroundColor: '#378ADD', marginHorizontal: 20, borderRadius: 20, padding: 20, marginVertical: 15 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20 },
+  title: { fontSize: 28, fontWeight: "800", color: "#111" },
+  archiveBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#E6F1FB', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
+  archiveText: { fontSize: 12, fontWeight: '700', color: '#378ADD' },
+  scroll: { paddingHorizontal: 20 },
+  summaryCard: { backgroundColor: "#1a1a2e", borderRadius: 20, padding: 20, marginBottom: 20 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  summaryLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600', textTransform: 'uppercase' },
-  summaryVal: { color: '#fff', fontSize: 18, fontWeight: '700', marginTop: 2 },
-  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 15 },
-  unallocatedLabel: { color: '#fff', fontSize: 13, fontWeight: '500' },
-  unallocatedVal: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  scroll: { flex: 1, paddingHorizontal: 20 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 15 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#111' },
-  addGoalBtn: { color: '#378ADD', fontWeight: '700', fontSize: 13 },
-  emptyGoal: { padding: 30, alignItems: 'center', backgroundColor: '#f9f9f9', borderRadius: 16, borderStyle: 'dashed', borderWidth: 1, borderColor: '#ccc' },
-  emptyGoalText: { color: '#aaa', fontSize: 13 },
-  goalCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#eee' },
-  goalIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' },
-  goalName: { fontSize: 15, fontWeight: '700', color: '#111' },
-  goalTarget: { fontSize: 12, color: '#888', marginTop: 2 },
-  depositBtn: { backgroundColor: '#E1F5EE', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  depositText: { color: '#1D9E75', fontSize: 12, fontWeight: '700' },
-  card: { backgroundColor: "#f9f9f9", borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#f0f0f0' },
-  cardRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-  catName: { fontSize: 15, fontWeight: "600", color: "#111" },
-  spent: { fontSize: 14, fontWeight: "700", color: "#111" },
-  budgetOf: { fontSize: 12, color: "#888" },
-  progressBg: { height: 8, backgroundColor: "#e8e8e8", borderRadius: 99, overflow: "hidden", marginTop: 10 },
-  progressFill: { height: 8, borderRadius: 99 },
-  input: { flex: 1, borderWidth: 1, borderColor: "#ddd", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, backgroundColor: "#fff", color: "#111" },
-  saveBtn: { paddingHorizontal: 15, borderRadius: 10, justifyContent: "center", alignItems: 'center' },
-  btnTextSmall: { color: "#fff", fontSize: 12, fontWeight: "700" },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 30 },
-  modalCard: { backgroundColor: '#fff', borderRadius: 20, padding: 24 },
-  modalTitle: { fontSize: 18, fontWeight: '800', marginBottom: 20, color: '#111' },
-  subLabel: { fontSize: 12, color: '#888', marginBottom: 10, fontWeight: '600' },
-  walletPicker: { flexDirection: 'row', gap: 8, marginBottom: 20 },
-  miniWalletBtn: { flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#eee', alignItems: 'center' },
-  miniWalletBtnActive: { borderColor: '#1D9E75', backgroundColor: '#E1F5EE' },
-  miniWalletText: { fontSize: 12, color: '#888', fontWeight: '600' },
-  miniWalletTextActive: { color: '#1D9E75' },
-  modalInput: { borderWidth: 1, borderColor: '#eee', borderRadius: 12, padding: 14, marginBottom: 12, fontSize: 15 },
-  modalRow: { flexDirection: 'row', gap: 12, marginTop: 10 },
+  summaryLabel: { fontSize: 9, color: 'rgba(255,255,255,0.4)', fontWeight: '700', letterSpacing: 1 },
+  summaryVal: { fontSize: 18, color: '#fff', fontWeight: '700', marginTop: 4 },
+  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginVertical: 15 },
+  unallocatedLabel: { fontSize: 11, color: '#fff', fontWeight: '600', opacity: 0.7 },
+  unallocatedVal: { fontSize: 20, color: '#5DCAA5', fontWeight: '800' },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#111' },
+  addBtn: { fontSize: 13, fontWeight: '700', color: '#378ADD' },
+  goalsList: { flexDirection: 'row' },
+  goalCard: { width: 160, backgroundColor: '#f9f9f9', borderRadius: 18, padding: 16, marginRight: 15, borderWidth: 1, borderColor: '#eee' },
+  goalIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  goalName: { fontSize: 14, fontWeight: '700', color: '#111' },
+  goalTarget: { fontSize: 10, color: '#888', marginTop: 2, marginBottom: 8 },
+  catCard: { backgroundColor: '#fff', borderRadius: 18, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#eee' },
+  catInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  iconBox: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  catName: { fontSize: 15, fontWeight: '700', color: '#111' },
+  spent: { fontSize: 14, fontWeight: '700', color: '#111' },
+  budgetOf: { fontSize: 12, color: '#aaa' },
+  editIcon: { padding: 8 },
+  editRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  budgetInput: { width: 80, backgroundColor: '#f5f5f5', borderRadius: 8, padding: 6, fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  progressTrack: { height: 6, backgroundColor: '#f0f0f0', borderRadius: 3, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: '#378ADD', borderRadius: 3 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
+  modalCard: { backgroundColor: '#fff', borderRadius: 24, padding: 24 },
+  modalTitle: { fontSize: 20, fontWeight: '800', marginBottom: 20, color: '#111' },
+  input: { backgroundColor: '#f5f5f5', borderRadius: 12, padding: 14, fontSize: 16, marginBottom: 15 },
+  subLabel: { fontSize: 12, fontWeight: '700', color: '#aaa', textTransform: 'uppercase', marginBottom: 10 },
+  walletPicker: { flexDirection: 'row', marginBottom: 20 },
+  miniWalletBtn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: '#f5f5f5', borderWidth: 1, borderColor: '#eee' },
+  miniWalletBtnActive: { backgroundColor: '#378ADD', borderColor: '#378ADD' },
+  miniWalletText: { fontSize: 12, color: '#666', fontWeight: '600' },
+  miniWalletTextActive: { color: '#fff' },
+  modalActions: { flexDirection: 'row', gap: 12, marginTop: 10 },
   cancelBtn: { flex: 1, padding: 14, alignItems: 'center', borderRadius: 12, backgroundColor: '#f0f0f0' },
   confirmBtn: { flex: 2, padding: 14, alignItems: 'center', borderRadius: 12, backgroundColor: '#378ADD' }
 });
