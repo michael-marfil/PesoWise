@@ -3,6 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View, Alert, Vibration } from 'reac
 import * as SecureStore from 'expo-secure-store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as LocalAuthentication from 'expo-local-authentication';
 
 const PIN_KEY = 'user_app_pin';
 
@@ -15,6 +16,41 @@ export default function PinScreen({ mode, onSuccess }: Props) {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [isConfirming, setIsConfirming] = useState(false);
+  const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
+
+  useEffect(() => {
+    checkBiometrics();
+  }, []);
+
+  const checkBiometrics = async () => {
+    const hasHardware = await LocalAuthentication.hasHardwareAsync();
+    const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+    if (hasHardware && isEnrolled) {
+      setIsBiometricAvailable(true);
+      if (mode === 'verify') {
+        // Short delay to let the screen mount
+        setTimeout(() => {
+          handleBiometricAuth();
+        }, 500);
+      }
+    }
+  };
+
+  const handleBiometricAuth = async () => {
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Unlock PesoWise',
+        fallbackLabel: 'Use PIN',
+        disableDeviceFallback: false,
+      });
+
+      if (result.success) {
+        onSuccess();
+      }
+    } catch (e) {
+      console.error("Biometric error:", e);
+    }
+  };
 
   const handlePress = (num: string) => {
     if (pin.length < 6) {
@@ -87,10 +123,21 @@ export default function PinScreen({ mode, onSuccess }: Props) {
               <Text style={styles.keyText}>{num}</Text>
             </TouchableOpacity>
           ))}
-          <View style={styles.key} />
+          
+          <TouchableOpacity 
+            style={[styles.key, { backgroundColor: 'transparent' }]} 
+            onPress={handleBiometricAuth}
+            disabled={!isBiometricAvailable || mode === 'setup'}
+          >
+            {isBiometricAvailable && mode === 'verify' && (
+              <Ionicons name="finger-print" size={32} color="#378ADD" />
+            )}
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.key} onPress={() => handlePress('0')}>
             <Text style={styles.keyText}>0</Text>
           </TouchableOpacity>
+          
           <TouchableOpacity style={styles.key} onPress={handleBackspace}>
             <Ionicons name="backspace-outline" size={28} color="#444" />
           </TouchableOpacity>

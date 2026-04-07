@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Transaction } from '../context/TransactionContext';
-import { CATEGORIES, fmt } from '../constants/data';
+import { Transaction, useTransactions } from '../context/TransactionContext';
+import { CATEGORIES } from '../constants/data';
 import { Ionicons } from '@expo/vector-icons';
 
 type Props = {
@@ -11,7 +11,26 @@ type Props = {
 };
 
 export default function TransactionDetailsModal({ visible, transaction, onClose }: Props) {
+  const { setForm, setShowAdd, setEditingId, fmt } = useTransactions();
   if (!transaction) return null;
+
+  const onEditPress = () => {
+    // 1. Fill the form with existing data
+    setForm({
+      description: transaction.description,
+      amount: String(transaction.amount),
+      type: transaction.type,
+      category: transaction.category,
+      date: transaction.date,
+      wallet: transaction.wallet,
+      to_wallet: transaction.to_wallet || "GCash",
+    });
+    // 2. Set the editing ID
+    setEditingId(transaction.id);
+    // 3. Close this modal and open the Add/Edit modal
+    onClose();
+    setShowAdd(true);
+  };
 
   const cat = transaction.type === 'transfer' 
     ? { icon: '🔄', color: '#EF9F27' }
@@ -76,9 +95,15 @@ export default function TransactionDetailsModal({ visible, transaction, onClose 
             </View>
           </View>
 
-          <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-            <Text style={styles.closeBtnText}>Close</Text>
-          </TouchableOpacity>
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.editBtn} onPress={onEditPress}>
+              <Ionicons name="pencil" size={18} color="#378ADD" />
+              <Text style={styles.editBtnText}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+              <Text style={styles.closeBtnText}>Close</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </TouchableOpacity>
     </Modal>
@@ -151,9 +176,31 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
   },
-  closeBtn: {
+  actionRow: {
+    flexDirection: 'row',
+    gap: 12,
     marginTop: 10,
     width: '100%',
+  },
+  editBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#E6F1FB',
+    borderWidth: 1,
+    borderColor: '#378ADD',
+  },
+  editBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#378ADD',
+  },
+  closeBtn: {
+    flex: 1,
     paddingVertical: 14,
     borderRadius: 14,
     backgroundColor: '#f5f5f5',

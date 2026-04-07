@@ -1,15 +1,23 @@
-import { StyleSheet, Text, View } from "react-native";
-import { fmt } from "../constants/data";
-import { Wallet } from "../context/TransactionContext";
+import { StyleSheet, Text, View, ScrollView } from "react-native";
+import { useTransactions } from "../context/TransactionContext";
 
 type Props = { 
   balance: number; 
   totalIncome: number; 
   totalExpense: number;
-  walletBalances: Record<Wallet, number>;
+  walletBalances: Record<string, number>;
 };
 
 export default function BalanceCard({ balance, totalIncome, totalExpense, walletBalances }: Props) {
+  const { wallets, fmt } = useTransactions();
+  
+  // Use dynamic wallets if available, otherwise fallback to defaults
+  const displayWallets = wallets.length > 0 ? wallets : [
+    { id: 1, name: "Cash", icon: "💵", color: "#1D9E75" },
+    { id: 2, name: "GCash", icon: "💙", color: "#378ADD" },
+    { id: 3, name: "Bank", icon: "🏦", color: "#EF9F27" }
+  ];
+
   return (
     <View style={styles.card}>
       <Text style={styles.label}>TOTAL BALANCE</Text>
@@ -26,20 +34,14 @@ export default function BalanceCard({ balance, totalIncome, totalExpense, wallet
         </View>
       </View>
 
-      <View style={styles.walletGrid}>
-        <View style={styles.walletItem}>
-          <Text style={styles.walletLabel}>💵 Cash</Text>
-          <Text style={styles.walletVal}>{fmt(walletBalances.Cash)}</Text>
-        </View>
-        <View style={styles.walletItem}>
-          <Text style={styles.walletLabel}>💙 GCash</Text>
-          <Text style={styles.walletVal}>{fmt(walletBalances.GCash)}</Text>
-        </View>
-        <View style={styles.walletItem}>
-          <Text style={styles.walletLabel}>🏦 Bank</Text>
-          <Text style={styles.walletVal}>{fmt(walletBalances.Bank)}</Text>
-        </View>
-      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.walletGrid}>
+        {displayWallets.map(w => (
+          <View key={w.id} style={styles.walletItem}>
+            <Text style={styles.walletLabel}>{w.icon} {w.name}</Text>
+            <Text style={styles.walletVal}>{fmt(walletBalances[w.name] || 0)}</Text>
+          </View>
+        ))}
+      </ScrollView>
     </View>
   );
 }
@@ -52,8 +54,8 @@ const styles = StyleSheet.create({
   box:      { flex: 1, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 12, padding: 12 },
   boxLabel: { fontSize: 10, color: "rgba(255,255,255,0.5)", letterSpacing: 0.8, marginBottom: 4 },
   boxAmt:   { fontSize: 17, fontWeight: "700" },
-  walletGrid: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)', paddingTop: 15 },
-  walletItem: { flex: 1 },
+  walletGrid: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)', paddingTop: 15 },
+  walletItem: { marginRight: 25 },
   walletLabel: { fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 2 },
   walletVal: { fontSize: 13, fontWeight: '600', color: '#fff' }
 });

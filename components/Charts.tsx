@@ -1,6 +1,6 @@
 import { Dimensions, StyleSheet, Text, View } from "react-native";
 import Svg, { Path, G, Text as SvgText, Circle } from 'react-native-svg';
-import { fmt } from "../constants/data";
+import { useTransactions } from "../context/TransactionContext";
 
 const W = Dimensions.get("window").width;
 
@@ -8,7 +8,7 @@ type BarData = { day: string; amount: number };
 type PieData = { name: string; color: string; spent: number };
 
 export function MiniBarChart({ data }: { data: BarData[] }) {
-  if (!data || !Array.isArray(data)) return null; // ADDED SAFETY
+  if (!data || !Array.isArray(data)) return null;
   const max = Math.max(...data.map(d => d.amount), 1);
   return (
     <View style={styles.barWrap}>
@@ -23,6 +23,7 @@ export function MiniBarChart({ data }: { data: BarData[] }) {
 }
 
 export function DonutChart({ data }: { data: PieData[] }) {
+  const { fmt } = useTransactions();
   const total = data.reduce((s, d) => s + d.spent, 0);
   if (total === 0) return <Text style={styles.empty}>No expenses yet.</Text>;
 
@@ -83,6 +84,7 @@ export function DonutChart({ data }: { data: PieData[] }) {
 }
 
 export function CategoryLegend({ data }: { data: PieData[] }) {
+  const { fmt } = useTransactions();
   return (
     <View style={styles.legend}>
       {data.map(c => (
@@ -91,6 +93,35 @@ export function CategoryLegend({ data }: { data: PieData[] }) {
           <Text style={styles.legendText}>{c.name} {fmt(c.spent)}</Text>
         </View>
       ))}
+    </View>
+  );
+}
+
+export function TopExpensesList({ data }: { data: PieData[] }) {
+  const { fmt } = useTransactions();
+  const total = data.reduce((s, d) => s + d.spent, 0);
+  const sorted = [...data].sort((a, b) => b.spent - a.spent);
+
+  if (total === 0) return null;
+
+  return (
+    <View style={styles.topList}>
+      {sorted.map(c => {
+        const pct = ((c.spent / total) * 100).toFixed(0);
+        return (
+          <View key={c.name} style={styles.topItem}>
+            <View style={styles.topInfo}>
+              <View style={[styles.dot, { backgroundColor: c.color, marginRight: 8 }]} />
+              <Text style={styles.topName}>{c.name}</Text>
+              <Text style={styles.topPct}>{pct}%</Text>
+            </View>
+            <View style={styles.barTrack}>
+              <View style={[styles.barFill, { backgroundColor: c.color, width: `${pct}%` }]} />
+            </View>
+            <Text style={styles.topAmt}>{fmt(c.spent)}</Text>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -112,4 +143,12 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   dot:        { width: 10, height: 10, borderRadius: 3 },
   legendText: { fontSize: 12, color: "#444", fontWeight: '500' },
+  topList:    { marginTop: 10 },
+  topItem:    { marginBottom: 14 },
+  topInfo:    { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  topName:    { flex: 1, fontSize: 13, fontWeight: '600', color: '#333' },
+  topPct:     { fontSize: 12, color: '#888', fontWeight: '600' },
+  barTrack:   { height: 6, backgroundColor: '#f0f0f0', borderRadius: 3, overflow: 'hidden', marginBottom: 4 },
+  barFill:    { height: '100%', borderRadius: 3 },
+  topAmt:     { fontSize: 11, color: '#666', fontWeight: '500', textAlign: 'right' },
 });

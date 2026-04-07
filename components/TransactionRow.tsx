@@ -1,15 +1,15 @@
 import { StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from "react-native";
-import { CATEGORIES, fmt } from "../constants/data";
+import { CATEGORIES } from "../constants/data";
 import { Transaction, useTransactions } from "../context/TransactionContext";
 
 type Props = { 
   t: Transaction; 
-  onDelete: (id: number) => void;
-  onPress?: () => void; // NEW
+  onDelete: (id: number) => void; 
+  onPress: () => void;
 };
 
 export default function TransactionRow({ t, onDelete, onPress }: Props) {
-  const { isSubmitting } = useTransactions();
+  const { isSubmitting, fmt } = useTransactions();
   const isTransfer = t.type === 'transfer';
   const cat = isTransfer ? { icon: "🔄", color: "#EF9F27" } : (CATEGORIES.find(c => c.name === t.category) || CATEGORIES[5]);
   

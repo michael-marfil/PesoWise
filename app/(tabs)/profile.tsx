@@ -2,6 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Updates from 'expo-updates';
 import { Link } from 'expo-router';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,7 +15,7 @@ const PRESET_COLORS = ["#378ADD", "#1D9E75", "#BA7517", "#D4537E", "#888780", "#
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
-  const { profile, updateProfile, uploadAvatar, categories, addCategory, deleteCategory, isSubmitting } = useTransactions();
+  const { profile, updateProfile, uploadAvatar, categories, addCategory, deleteCategory, isSubmitting, currency, setCurrency, transactions } = useTransactions();
   
   const [name, setName] = useState(profile?.full_name || "");
   const [isEditing, setIsEditing] = useState(false);
@@ -24,6 +26,9 @@ export default function ProfileScreen() {
   const [newCatName, setNewCatName] = useState("");
   const [newCatIcon, setNewCatIcon] = useState("📦");
   const [newCatColor, setNewCatColor] = useState("#378ADD");
+
+  const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+  const CURRENCIES = ["₱", "$", "€", "¥", "£", "₩"];
 
   const defaultCats = categories.filter(c => c.is_default);
   const customCats  = categories.filter(c => !c.is_default);
@@ -49,6 +54,35 @@ export default function ProfileScreen() {
     await addCategory(newCatName, newCatIcon, newCatColor);
     setShowCatModal(false);
     setNewCatName("");
+  };
+
+  const onExportCSV = async () => {
+    try {
+      if (transactions.length === 0) {
+        Alert.alert("No Data", "There are no transactions to export.");
+        return;
+      }
+
+      // 1. Create CSV content
+      const headers = "Date,Description,Amount,Type,Category,Wallet\n";
+      const rows = transactions.map(t => 
+        `${t.date},"${t.description.replace(/"/g, '""')}",${t.amount},${t.type},${t.category},${t.wallet}`
+      ).join("\n");
+      const csvString = headers + rows;
+
+      // 2. Save to file
+      const fileUri = FileSystem.cacheDirectory + "pesowise_history.csv";
+      await FileSystem.writeAsStringAsync(fileUri, csvString, { encoding: FileSystem.EncodingType.UTF8 });
+
+      // 3. Share
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri);
+      } else {
+        Alert.alert("Error", "Sharing is not available on this device");
+      }
+    } catch (e: any) {
+      Alert.alert("Export Failed", e.message);
+    }
   };
 
   const onLogout = () => {
@@ -149,6 +183,38 @@ export default function ProfileScreen() {
 
           <View style={styles.settingItem}>
             <View style={styles.settingInfo}>
+              <Ionicons name="cash-outline" size={20} color="#666" />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.settingLabel}>Currency Symbol</Text>
+                <Text style={styles.settingValue}>{currency}</Text>
+              </View>
+            </View>
+            <TouchableOpacity 
+              onPress={() => setShowCurrencyModal(true)}
+              style={styles.editBtn}
+            >
+              <Text style={styles.editBtnText}>Change</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.settingItem}>
+            <View style={styles.settingInfo}>
+              <Ionicons name="share-outline" size={20} color="#666" />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.settingLabel}>Export History</Text>
+                <Text style={styles.settingValue}>Save as CSV / Excel</Text>
+              </View>
+            </View>
+            <TouchableOpacity 
+              onPress={onExportCSV}
+              style={styles.editBtn}
+            >
+              <Text style={styles.editBtnText}>Export</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.settingItem}>
+            <View style={styles.settingInfo}>
               <Ionicons name="cloud-download-outline" size={20} color="#666" />
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={styles.settingLabel}>App Updates</Text>
@@ -175,6 +241,19 @@ export default function ProfileScreen() {
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={styles.settingLabel}>Subscriptions</Text>
                   <Text style={styles.settingValue}>Manage recurring logs</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#ccc" />
+            </TouchableOpacity>
+          </Link>
+
+          <Link href="/wallets" asChild>
+            <TouchableOpacity style={styles.settingItem}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="wallet-outline" size={20} color="#666" />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.settingLabel}>My Wallets</Text>
+                  <Text style={styles.settingValue}>Add bank accounts or cash</Text>
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={18} color="#ccc" />
@@ -233,6 +312,33 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* CURRENCY SELECTOR MODAL */}
+      <Modal visible={showCurrencyModal} transparent animationType="fade">
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setShowCurrencyModal(false)}
+        >
+          <View style={[styles.modalCard, { paddingBottom: 40 }]}>
+            <Text style={styles.modalTitle}>Select Currency</Text>
+            <View style={styles.presetRow}>
+              {CURRENCIES.map(c => (
+                <TouchableOpacity 
+                  key={c} 
+                  onPress={() => {
+                    setCurrency(c);
+                    setShowCurrencyModal(false);
+                  }} 
+                  style={[styles.presetBtn, currency === c && styles.presetActive, { width: 60, height: 60 }]}
+                >
+                  <Text style={{ fontSize: 24, fontWeight: '700' }}>{c}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );
