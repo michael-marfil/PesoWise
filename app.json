@@ -48,7 +48,13 @@
       ],
       "expo-secure-store",
       "@react-native-community/datetimepicker",
-      "expo-updates"
+      "expo-updates",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow PesoWise to use FaceID for secure access."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
